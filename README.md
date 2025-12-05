@@ -1,94 +1,100 @@
-# Obsidian Sample Plugin
+# Obsidian RAG Assistant (Frontend)
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+<div align="center">
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+[![Language](https://img.shields.io/badge/Language-中文-blue?style=for-the-badge)](./README_CN.md)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](./LICENSE)
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+</div>
 
-## First time developing plugins?
+**Obsidian RAG Assistant** is a plugin based on RAG (Retrieval-Augmented Generation) architecture. It connects your Obsidian vault to a local Java backend, transforming your notes into a vector knowledge base to enable precise Q&A based on your personal knowledge reserve.
 
-Quick starting guide for new plugin devs:
+> [!IMPORTANT] > **Separation of Frontend and Backend:**
+> This repository contains **only the Frontend (Obsidian Plugin) code**.
+> You must run the accompanying backend service for it to work:
+> 👉 **Backend Repository:** [https://github.com/XinYaoDev/obsidian-rag-backend](https://github.com/XinYaoDev/obsidian-rag-backend)
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+## ✨ Features
 
-## Releasing new releases
+-   **🧠 Knowledge Base Chat:** Perform RAG-based Q&A with your notes. Let AI truly "read" your books.
+-   **💾 Conversation Persistence:**
+    -   Chat history is automatically saved in `Vault/Assets/History/chat_history.json`.
+    -   Context is automatically loaded upon restarting Obsidian, supporting multi-turn conversations.
+    -   Supports one-click history clearing.
+-   **⚙️ Flexible Configuration:**
+    -   Supports multiple LLM providers (DeepSeek, Aliyun Qwen, OpenAI, Ollama, etc.).
+    -   Customizable API Keys and Backend URLs.
+-   **🔄 Smart Sync:**
+    -   Listens for file changes (`modify`/`create`) and automatically syncs note updates to the backend for vectorization.
+    -   Built-in **debounce** and user behavior detection to avoid unnecessary syncs caused by plugin conflicts (e.g., Remote Save).
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+## 🛠️ Installation
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+Since this project is currently in the development phase, installation via source code is recommended.
 
-## Adding your plugin to the community plugin list
+### Prerequisites
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+-   **Node.js (v16+)** installed.
+-   **RAG Backend Service** started (Default port: `8081`).
 
-## How to use
+### Development Mode Installation (Recommended)
 
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
+1.  Clone this repository into your Obsidian plugins directory:
 
-## Manually installing the plugin
+    ```bash
+    cd <Your_Obsidian_Vault_Path>/.obsidian/plugins/
+    git clone [https://github.com/XinYaoDev/obsidian-rag-plugin.git](https://github.com/XinYaoDev/obsidian-rag-plugin.git) my-rag-plugin
+    cd my-rag-plugin
+    ```
 
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
+2.  Install dependencies:
 
-## Improve code quality with eslint (optional)
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- To use eslint with this project, make sure to install eslint from terminal:
-  - `npm install -g eslint`
-- To use eslint to analyze this project use this command:
-  - `eslint main.ts`
-  - eslint will then create a report with suggestions for code improvement by file and line number.
-- If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder:
-  - `eslint ./src/`
+    ```bash
+    npm install
+    ```
 
-## Funding URL
+3.  Start Watch Mode:
 
-You can include funding URLs where people who use your plugin can financially support it.
+    ```bash
+    npm run dev
+    ```
 
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
+    _Code changes will now automatically compile and sync to Obsidian._
 
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
-```
+4.  Open Obsidian and enable **RAG Assistant** in **Settings -> Community Plugins**.
 
-If you have multiple URLs, you can also do:
+## ⚙️ Configuration
 
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
-```
+Once enabled, go to **Settings -> RAG Assistant Configuration**:
 
-## API Documentation
+1.  **Java Backend URL:** Default is `http://localhost:8081` (Ensure backend is running).
+2.  **LLM Settings:**
+    -   **Provider:** e.g., `Aliyun` (Qwen) or `DeepSeek`.
+    -   **API Key:** Enter the API Key from your provider.
+    -   **Model Name:** e.g., `qwen-turbo` or `deepseek-chat`.
+3.  **Embedding Settings:**
+    -   **Provider:** e.g., `Aliyun`.
+    -   **API Key:** Enter your API Key.
+    -   **Model Name:** e.g., `text-embedding-v1`.
 
-See https://github.com/obsidianmd/obsidian-api
+## 🖥️ Usage
+
+1.  Click the **🤖 Robot Icon** in the left sidebar (Ribbon) to open the Assistant panel.
+2.  Type your question in the input box at the bottom and press **Enter** to send (Press **Shift+Enter** for a new line).
+3.  Click the **Trash Can Icon** at the top to clear the current history.
+
+## 📅 Roadmap
+
+-   [ ] Streaming Response (SSE)
+-   [ ] UI Polish & Theming
+
+## 🤝 Contributing
+
+Issues and Pull Requests are welcome!
+
+-   **Frontend Issues:** Please submit to this repository.
+-   **Backend/Algorithm Issues:** Please submit to the [Backend Repository](https://github.com/XinYaoDev/obsidian-rag-backend).
+
+## 📄 License
+
+[MIT License](./LICENSE)
