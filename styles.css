@@ -21,6 +21,7 @@
     border-bottom: 1px solid var(--background-modifier-border);
     background-color: var(--background-secondary);
     flex-shrink: 0;
+    position: relative; /* 新增：为下拉菜单提供定位上下文 */
 }
 
 .chat-header h4 {
@@ -109,6 +110,12 @@
     background-color: var(--background-modifier-error-subtle);
     color: var(--text-error);
     border: 1px solid var(--background-modifier-error);
+}
+
+/* 错误消息内的链接颜色 */
+.chat-message-bubble.error a {
+    color: var(--text-error);
+    text-decoration: underline;
 }
 
 /* Loading 动画样式 */
@@ -418,4 +425,223 @@
 .chat-header-btn svg {
     width: 18px;
     height: 18px;
+}
+
+/* =========================================
+   会话管理区域样式
+========================================= */
+
+/* 会话选择器容器 */
+.session-selector-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    background-color: var(--background-primary);
+    gap: 12px;
+}
+
+/* 当前会话名称显示 */
+.current-session-name {
+    font-weight: 600;
+    color: var(--text-accent);
+    font-size: 1em;
+    cursor: pointer;
+    user-select: none;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.current-session-name:hover {
+    opacity: 0.8;
+}
+
+/* 会话操作按钮组 */
+.session-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.session-action-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    transition: all 0.2s ease;
+}
+
+.session-action-btn:hover {
+    background-color: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+.session-action-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* 删除按钮悬停时变红 */
+.session-action-btn.delete:hover {
+    background-color: var(--background-modifier-error-hover);
+    color: var(--text-error);
+}
+
+/* 会话下拉菜单 */
+.session-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 16px;
+    right: 16px;
+    margin-top: 4px;
+    background-color: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    max-height: 400px;
+    overflow-y: auto;
+    z-index: 1000;
+    padding: 8px;
+}
+
+/* 会话项 */
+.session-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    gap: 8px;
+}
+
+.session-item:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.session-item.active {
+    background-color: var(--background-modifier-border);
+}
+
+/* 激活状态标识 */
+.session-item .check-icon {
+    width: 16px;
+    height: 16px;
+    color: var(--text-accent);
+    flex-shrink: 0;
+}
+
+.session-item:not(.active) .check-icon {
+    opacity: 0;
+}
+
+/* 会话名称和信息 */
+.session-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.session-name {
+    font-weight: 500;
+    color: var(--text-normal);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.session-meta {
+    font-size: 0.85em;
+    color: var(--text-muted);
+}
+
+/* 会话项操作按钮 */
+.session-item-actions {
+    display: none;
+    gap: 4px;
+}
+
+.session-item:hover .session-item-actions {
+    display: flex;
+}
+
+.session-item-action {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    transition: all 0.2s ease;
+}
+
+.session-item-action:hover {
+    background-color: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+.session-item-action svg {
+    width: 14px;
+    height: 14px;
+}
+
+.session-item-action.delete:hover {
+    background-color: var(--background-modifier-error-hover);
+    color: var(--text-error);
+}
+
+/* 分隔线 */
+.session-divider {
+    height: 1px;
+    background-color: var(--background-modifier-border);
+    margin: 8px 4px;
+}
+
+/* 新建会话按钮 */
+.new-session-btn {
+    width: 100%;
+    padding: 10px 12px;
+    background: transparent;
+    border: 1px dashed var(--background-modifier-border);
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text-accent);
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.new-session-btn:hover {
+    background-color: var(--background-modifier-hover);
+    border-color: var(--text-accent);
+}
+
+/* 重命名输入框 */
+.session-rename-input {
+    background-color: var(--background-primary);
+    border: 1px solid var(--interactive-accent);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: inherit;
+    font-weight: 500;
+    color: var(--text-normal);
+    outline: none;
+    width: 100%;
+}
+
+.session-rename-input:focus {
+    box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
