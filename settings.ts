@@ -31,6 +31,9 @@ export interface RagSettings {
     // --- 同步设置 ---
     enableSync: boolean;        // 是否开启同步
     debounceDelay: number;      // 防抖延迟 (毫秒)
+    
+    // --- 深度思考设置 ---
+    enableDeepThinking: boolean; // 是否启用深度思考模式
 }
 
 export const DEFAULT_SETTINGS: RagSettings = {
@@ -45,5 +48,7 @@ export const DEFAULT_SETTINGS: RagSettings = {
     embeddingModelName: 'text-embedding-v1', // 默认值
 
     enableSync: true,
-    debounceDelay: 2000
+    debounceDelay: 2000,
+    
+    enableDeepThinking: false // 默认关闭深度思考
 }

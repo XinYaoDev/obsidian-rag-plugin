@@ -60,7 +60,54 @@ export class ChatView extends ItemView {
         // 3. 输入区域
         // ===========================
         const inputArea = container.createEl('div', { cls: 'chat-input-area' });
-        const inputBoxContainer = inputArea.createEl('div', { cls: 'input-box-container' });
+        
+        // ✅ 深度思考开关容器
+        const toggleContainer = inputArea.createEl('div', { cls: 'deep-thinking-toggle-container' });
+        
+        const toggleButton = toggleContainer.createEl('div', { 
+            cls: 'deep-thinking-toggle',
+            attr: { 'aria-label': '切换深度思考模式' }
+        });
+        
+        const toggleIcon = toggleButton.createEl('span', { cls: 'toggle-icon' });
+        setIcon(toggleIcon, 'zap');
+        
+        const toggleLabel = toggleButton.createEl('span', { 
+            cls: 'toggle-label',
+            text: '深度思考'
+        });
+        
+        // ✅ 初始化开关状态
+        const updateToggleState = () => {
+            if (this.plugin.settings.enableDeepThinking) {
+                toggleButton.removeClass('inactive');
+                toggleButton.addClass('active');
+            } else {
+                toggleButton.removeClass('active');
+                toggleButton.addClass('inactive');
+            }
+        };
+        updateToggleState();
+        
+        // ✅ 绑定开关点击事件
+        toggleButton.onclick = async () => {
+            // 切换状态
+            this.plugin.settings.enableDeepThinking = !this.plugin.settings.enableDeepThinking;
+            
+            // 更新 UI
+            updateToggleState();
+            
+            // 保存设置
+            await this.plugin.saveSettings();
+            
+            // 可选：显示反馈
+            const status = this.plugin.settings.enableDeepThinking ? '开启' : '关闭';
+            new Notice(`深度思考模式已${status}`);
+        };
+        
+        // ✅ 输入框和发送按钮的容器（保持在同一行）
+        const inputRowContainer = inputArea.createEl('div', { cls: 'input-row-container' });
+        const inputBoxContainer = inputRowContainer.createEl('div', { cls: 'input-box-container' });
 
         const inputEl = inputBoxContainer.createEl('textarea', {
             placeholder: '输入问题，按 Ctrl+Enter 发送...',
@@ -80,7 +127,7 @@ export class ChatView extends ItemView {
             }
         });
 
-        const sendBtn = inputArea.createEl('button', {
+        const sendBtn = inputRowContainer.createEl('button', {
             cls: 'chat-send-btn',
             attr: { 'aria-label': '发送' }
         });
@@ -124,7 +171,8 @@ export class ChatView extends ItemView {
                         question: content,
                         provider: providerCode,
                         model: modelName,
-                        history: this.chatHistory // ✅ 发送历史给后端
+                        history: this.chatHistory, // ✅ 发送历史给后端
+                        enableDeepThinking: this.plugin.settings.enableDeepThinking // ✅ 添加深度思考参数
                     })
                 });
 

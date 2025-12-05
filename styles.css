@@ -138,9 +138,109 @@
     border-top: 1px solid var(--background-modifier-border);
     background-color: var(--background-secondary);
     display: flex;
-    align-items: flex-end;
+    flex-direction: column; /* 修改为列布局以容纳开关 */
     gap: 12px;
     flex-shrink: 0;
+}
+
+/* 深度思考开关容器 */
+.deep-thinking-toggle-container {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+/* 深度思考开关基础样式 */
+.deep-thinking-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.3s ease;
+    background-color: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+}
+
+/* 开关图标样式 */
+.deep-thinking-toggle .toggle-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.deep-thinking-toggle .toggle-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* 开关文字标签 */
+.deep-thinking-toggle .toggle-label {
+    font-size: 0.9em;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+/* 激活状态（亮） */
+.deep-thinking-toggle.active {
+    background-color: var(--interactive-accent);
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 8px rgba(var(--interactive-accent-rgb), 0.3);
+}
+
+.deep-thinking-toggle.active .toggle-icon {
+    color: var(--text-on-accent);
+}
+
+.deep-thinking-toggle.active .toggle-icon svg {
+    color: var(--text-on-accent);
+    filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.6));
+}
+
+.deep-thinking-toggle.active .toggle-label {
+    color: var(--text-on-accent);
+}
+
+/* 非激活状态（暗） */
+.deep-thinking-toggle.inactive {
+    opacity: 0.6;
+}
+
+.deep-thinking-toggle.inactive .toggle-icon {
+    color: var(--text-muted);
+}
+
+.deep-thinking-toggle.inactive .toggle-icon svg {
+    color: var(--text-muted);
+}
+
+.deep-thinking-toggle.inactive .toggle-label {
+    color: var(--text-muted);
+}
+
+/* 悬停效果 */
+.deep-thinking-toggle:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.deep-thinking-toggle.active:hover {
+    box-shadow: 0 2px 8px rgba(var(--interactive-accent-rgb), 0.4);
+}
+
+.deep-thinking-toggle.inactive:hover {
+    opacity: 0.8;
+}
+
+/* 输入框和发送按钮的行容器 */
+.input-row-container {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    width: 100%;
 }
 
 /* 输入框外框 */
