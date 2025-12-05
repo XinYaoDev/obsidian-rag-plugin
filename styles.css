@@ -1,0 +1,321 @@
+/* =========================================
+   主容器布局：Flex 列布局，占满全高
+========================================= */
+.rag-chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;   
+    overflow: hidden; /* 隐藏溢出，交给子元素滚动 */
+    background-color: var(--background-primary);
+    padding: 0 !important; /* 覆盖原来可能有的 padding */
+}
+
+/* =========================================
+   1. 顶部区域样式 (Header)
+========================================= */
+.chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    background-color: var(--background-secondary);
+    flex-shrink: 0;
+}
+
+.chat-header h4 {
+    margin: 0;
+    font-size: 1.1em;
+    font-weight: 600;
+}
+
+/* (可选) 如果你以后想加回顶部标签，保留这些样式没坏处 */
+.model-select-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9em;
+    color: var(--text-muted);
+}
+.current-provider-badge {
+    font-size: 0.75em;
+    background-color: var(--background-modifier-border);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--text-muted);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* =========================================
+   2. 中间消息区域样式 (Scrollable)
+========================================= */
+.chat-messages {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px; /* 消息气泡之间的间距 */
+}
+
+/* 消息包装器 (用于左右对齐) */
+.chat-message-wrapper {
+    display: flex;
+    width: 100%;
+}
+.chat-message-wrapper.user {
+    justify-content: flex-end;
+}
+.chat-message-wrapper.ai {
+    justify-content: flex-start;
+}
+
+/* 消息气泡基础样式 */
+.chat-message-bubble {
+    padding: 12px 16px;
+    border-radius: 18px;
+    max-width: 85%;
+    
+    /* 关键：让 HTML 标签控制排版，消除幽灵换行 */
+    white-space: normal; 
+    
+    font-size: 0.95em;
+    line-height: 1.5;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    
+    /* 防止长单词撑爆容器 */
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+/* 用户气泡颜色 */
+.chat-message-bubble.user {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-bottom-right-radius: 4px;
+}
+
+/* AI 气泡颜色 */
+.chat-message-bubble.ai {
+    background-color: var(--background-secondary-alt);
+    border: 1px solid var(--background-modifier-border);
+    color: var(--text-normal);
+    border-bottom-left-radius: 4px;
+}
+
+/* 错误消息样式 */
+.chat-message-bubble.error {
+    background-color: var(--background-modifier-error-subtle);
+    color: var(--text-error);
+    border: 1px solid var(--background-modifier-error);
+}
+
+/* Loading 动画样式 */
+.chat-message-bubble.loading {
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 8px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+}
+.chat-message-bubble.loading svg {
+    width: 24px;
+    height: 24px;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    100% { transform: rotate(360deg); }
+}
+
+/* =========================================
+   3. 底部输入区域样式 (Fixed Bottom)
+========================================= */
+.chat-input-area {
+    padding: 16px;
+    border-top: 1px solid var(--background-modifier-border);
+    background-color: var(--background-secondary);
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+/* 输入框外框 */
+.input-box-container {
+    flex-grow: 1;
+    display: flex;
+    border: 1px solid var(--background-modifier-border-hover);
+    border-radius: 12px;
+    background-color: var(--background-primary);
+    padding: 10px 12px;
+    transition: all 0.2s ease;
+}
+.input-box-container:focus-within {
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+/* 输入框本体 */
+.chat-input {
+    flex-grow: 1;
+    border: none;
+    background: transparent;
+    resize: none;
+    max-height: 200px;
+    min-height: 24px;
+    padding: 0;
+    margin: 0;
+    outline: none;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: 1.5;
+    overflow-y: auto;
+}
+
+/* 发送按钮 */
+.chat-send-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    padding: 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.chat-send-btn:hover {
+    background-color: var(--interactive-accent-hover);
+}
+.chat-send-btn:active {
+    transform: scale(0.95);
+}
+.chat-send-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* ============================================================
+   Markdown 渲染紧凑模式 (Compact Mode)
+   强制覆盖 Obsidian 默认的大间距样式，避免气泡内空旷
+============================================================ */
+
+/* 1. 消除段落的大间距 */
+.chat-message-bubble p {
+    margin-block-start: 6px !important;
+    margin-block-end: 6px !important;
+}
+
+/* 2. 消除首尾元素的额外间距 (防止气泡顶部底部留白) */
+.chat-message-bubble > *:first-child {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+.chat-message-bubble > *:last-child {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+/* 3. 列表紧凑化 */
+.chat-message-bubble ul, 
+.chat-message-bubble ol {
+    margin-block-start: 4px !important;
+    margin-block-end: 4px !important;
+    padding-inline-start: 1.5em !important;
+}
+
+.chat-message-bubble li {
+    margin: 0 !important;
+}
+
+/* 4. 代码块样式修正 */
+.chat-message-bubble pre {
+    margin: 8px 0 !important;
+    padding: 8px !important;
+    background-color: var(--background-primary-alt);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+}
+
+/* 5. 标题紧凑化 */
+.chat-message-bubble h1, 
+.chat-message-bubble h2, 
+.chat-message-bubble h3 {
+    margin-block-start: 12px !important;
+    margin-block-end: 6px !important;
+    font-size: 1.1em !important;
+    line-height: 1.2;
+}
+
+/* ============================================================
+   修复列表“松散模式”导致的大间距
+   (针对 li 内部包裹了 p 标签的情况)
+============================================================ */
+
+/* 强制去掉列表项内部段落的上下边距 */
+.chat-message-bubble li p {
+    margin-block-start: 0 !important;
+    margin-block-end: 0 !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    display: inline-block; /* 或者是 block，视情况而定，inline-block通常能紧凑布局 */
+}
+
+/* 确保列表项本身也没有间距 */
+.chat-message-bubble li {
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1.4 !important; /* 列表行高稍微紧凑一点 */
+}
+
+/* 再次加固：确保列表容器紧凑 */
+.chat-message-bubble ul, 
+.chat-message-bubble ol {
+    margin-top: 4px !important;
+    margin-bottom: 4px !important;
+}
+
+/* 修复：避免第一个列表项顶部有多余空白 */
+.chat-message-bubble ul > li:first-child,
+.chat-message-bubble ol > li:first-child {
+    margin-top: 0 !important;
+}
+
+/* 顶部操作按钮（如清空按钮） */
+.chat-header-btn {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: var(--text-muted); /* 默认灰色 */
+    cursor: pointer;
+    padding: 6px; /* 稍微大一点的点击区域 */
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+/* 悬停状态 - 强制变红 */
+.chat-header-btn:hover {
+    color: var(--text-error) !important; /* 强制变红 */
+    background-color: var(--background-modifier-error-hover) !important; /* 红色浅背景 */
+}
+
+/* 确保内部图标也变色 */
+.chat-header-btn:hover svg {
+    color: var(--text-error) !important;
+    stroke: var(--text-error) !important; /* 部分图标使用 stroke */
+}
+
+.chat-header-btn svg {
+    width: 18px;
+    height: 18px;
+}

@@ -1,0 +1,11 @@
+{
+    "id": "obsidian-rag-plugin",
+    "name": "My RAG Assistant Plugin",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "我的个人知识库 AI 助手",
+	"author": "ALIVE",
+	"authorUrl": "https://github.com/XinYaoDev",
+	"fundingUrl": "https://obsidian.md/pricing",
+	"isDesktopOnly": false
+}
