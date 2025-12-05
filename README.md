@@ -2,98 +2,141 @@
 
 <div align="center">
 
-[![Language](https://img.shields.io/badge/Language-中文-blue?style=for-the-badge)](./README_CN.md)
+### 🚀 Supercharge Your Obsidian Second Brain with AI
+
+[![English](https://img.shields.io/badge/Language-English-blue?style=for-the-badge)](./README_en.md)
+[![Chinese](https://img.shields.io/badge/Language-中文-red?style=for-the-badge)](./README.md)
+
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](./LICENSE)
+[![Release](https://img.shields.io/github/v/release/XinYaoDev/obsidian-rag-plugin?style=for-the-badge&color=orange)](https://github.com/XinYaoDev/obsidian-rag-plugin/releases)
 
 </div>
 
-**Obsidian RAG Assistant** is a plugin based on RAG (Retrieval-Augmented Generation) architecture. It connects your Obsidian vault to a local Java backend, transforming your notes into a vector knowledge base to enable precise Q&A based on your personal knowledge reserve.
+---
 
-> [!IMPORTANT] > **Separation of Frontend and Backend:**
-> This repository contains **only the Frontend (Obsidian Plugin) code**.
-> You must run the accompanying backend service for it to work:
-> 👉 **Backend Repository:** [https://github.com/XinYaoDev/obsidian-rag-backend](https://github.com/XinYaoDev/obsidian-rag-backend)
+This is an **RAG (Retrieval-Augmented Generation)** based personal knowledge assistant plugin for Obsidian.
+It is not just a simple AI chat interface. By connecting to a local **Java Backend**, it transforms your Obsidian notes into a vector knowledge base, enabling precise Q&A based on your personal knowledge reserve.
+
+> [!IMPORTANT] > **⚠️ Frontend-Backend Separation**
+>
+> This repository contains **Frontend (Obsidian Plugin)** code only.
+> You must run the companion Backend service for it to work.
+>
+> 👉 **Backend Repository:** [**obsidian-rag-backend**](https://github.com/XinYaoDev/obsidian-rag-backend)
+
+---
 
 ## ✨ Features
 
--   **🧠 Knowledge Base Chat:** Perform RAG-based Q&A with your notes. Let AI truly "read" your books.
--   **💾 Conversation Persistence:**
-    -   Chat history is automatically saved in `Vault/Assets/History/chat_history.json`.
-    -   Context is automatically loaded upon restarting Obsidian, supporting multi-turn conversations.
-    -   Supports one-click history clearing.
--   **⚙️ Flexible Configuration:**
-    -   Supports multiple LLM providers (DeepSeek, Aliyun Qwen, OpenAI, Ollama, etc.).
-    -   Customizable API Keys and Backend URLs.
--   **🔄 Smart Sync:**
-    -   Listens for file changes (`modify`/`create`) and automatically syncs note updates to the backend for vectorization.
-    -   Built-in **debounce** and user behavior detection to avoid unnecessary syncs caused by plugin conflicts (e.g., Remote Save).
+### 🧠 Core Capabilities
+
+-   **Chat with Notes:** Utilizing RAG technology, the AI retrieves relevant information from your notes before answering. Let the AI truly "read" your books to avoid hallucinations.
+-   **🚀 Deep Thinking Mode (CoT):**
+    -   Integrated with **DeepSeek R1** / **Qwen QwQ** reasoning models.
+    -   Provides an **independent toggle** to enable "Deep Thinking" with one click.
+    -   Displays the AI's **Chain of Thought (CoT)**, showing not just the result, but the logical deduction process.
+    -   _Collapsible UI for the thinking process to keep the interface clean._
+
+### 💾 Session Management
+
+-   **Conversation Persistence:** Chat history is automatically saved in `Assets/History/chat_history.json` within your Vault. Your data stays in your hands.
+-   **Context Memory:** Automatically loads the last conversation context upon restarting Obsidian, supporting multi-turn dialogue.
+-   **One-Click Reset:** A trash can icon allows you to clear history instantly and start a new topic.
+
+### ⚙️ Flexibility & Intelligence
+
+-   **Multi-Model Support:** Compatible with DeepSeek, Aliyun Qwen, OpenAI, Ollama, and other major providers.
+-   **Smart Sync:** Listens for file changes (`modify`/`create`) and automatically syncs updates to the backend for vectorization. Built-in **Debounce** mechanism ensures compatibility with sync plugins like Remote Save.
+
+---
+
+## 📸 Screenshots
+
+_(Placeholder for screenshot showing the sidebar chat, Deep Thinking toggle, and expanded reasoning block)_
+
+---
 
 ## 🛠️ Installation
 
-Since this project is currently in the development phase, installation via source code is recommended.
+This project is currently in the development phase. It is recommended to install via source code.
 
-### Prerequisites
+### 1. Prerequisites
 
--   **Node.js (v16+)** installed.
--   **RAG Backend Service** started (Default port: `8081`).
+-   Ensure **Node.js (v16+)** is installed.
+-   Ensure the **RAG Backend Service** is running (default port `8081`).
 
-### Development Mode Installation (Recommended)
+### 2. Development Mode Installation
 
-1.  Clone this repository into your Obsidian plugins directory:
-
+1.  Navigate to your Obsidian plugin directory:
     ```bash
-    cd <Your_Obsidian_Vault_Path>/.obsidian/plugins/
+    cd <Your_Vault_Path>/.obsidian/plugins/
+    ```
+2.  Clone the repository:
+    ```bash
     git clone [https://github.com/XinYaoDev/obsidian-rag-plugin.git](https://github.com/XinYaoDev/obsidian-rag-plugin.git) my-rag-plugin
     cd my-rag-plugin
     ```
-
-2.  Install dependencies:
-
+3.  Install dependencies and start watching:
     ```bash
     npm install
-    ```
-
-3.  Start Watch Mode:
-
-    ```bash
     npm run dev
     ```
+4.  Open Obsidian, go to **Settings -> Community Plugins**, and enable **RAG Assistant**.
 
-    _Code changes will now automatically compile and sync to Obsidian._
-
-4.  Open Obsidian and enable **RAG Assistant** in **Settings -> Community Plugins**.
+---
 
 ## ⚙️ Configuration
 
-Once enabled, go to **Settings -> RAG Assistant Configuration**:
+After enabling the plugin, go to **Settings -> RAG Assistant**:
 
-1.  **Java Backend URL:** Default is `http://localhost:8081` (Ensure backend is running).
-2.  **LLM Settings:**
-    -   **Provider:** e.g., `Aliyun` (Qwen) or `DeepSeek`.
-    -   **API Key:** Enter the API Key from your provider.
-    -   **Model Name:** e.g., `qwen-turbo` or `deepseek-chat`.
-3.  **Embedding Settings:**
-    -   **Provider:** e.g., `Aliyun`.
-    -   **API Key:** Enter your API Key.
-    -   **Model Name:** e.g., `text-embedding-v1`.
+### Basic Settings
 
-## 🖥️ Usage
+-   **Java Backend URL:** Default is `http://localhost:8081`.
 
-1.  Click the **🤖 Robot Icon** in the left sidebar (Ribbon) to open the Assistant panel.
-2.  Type your question in the input box at the bottom and press **Enter** to send (Press **Shift+Enter** for a new line).
-3.  Click the **Trash Can Icon** at the top to clear the current history.
+### LLM Settings
+
+-   **Provider:** Select `Aliyun` (Qwen), `DeepSeek`, etc.
+-   **API Key:** Enter the API Key provided by your cloud vendor.
+-   **Model Name:**
+    -   _Standard Mode:_ Recommended `qwen-plus` or `deepseek-chat`.
+    -   _Deep Thinking:_ Recommended `qwq-32b-preview` or `deepseek-reasoner` (requires backend support).
+
+### Embedding Settings
+
+-   **Model Name:** e.g., `text-embedding-v3` or `text-embedding-v1`.
+
+---
+
+## 🖥️ Usage Guide
+
+1.  **Open Assistant:** Click the **🤖 Robot Icon** in the left ribbon.
+2.  **Enable Deep Thinking:** (Optional) Toggle the **🧠 Deep Thinking** switch above the input box.
+3.  **Ask Questions:** Type your question and press **Enter** to send.
+4.  **Manage History:** Click the **🗑️ Trash Can** icon in the top toolbar to clear the current context.
+
+---
 
 ## 📅 Roadmap
 
--   [ ] Streaming Response (SSE)
--   [ ] UI Polish & Theming
+We are continuously improving the experience. Here is what's coming next:
+
+-   [x] Basic RAG Conversation & Auto-Sync
+-   [x] **Deep Thinking (CoT) Display & Toggle**
+-   [x] **Conversation History Persistence**
+-   [ ] **📋 One-Click Copy:** Support copying code blocks or full AI responses with one click.
+-   [ ] **🛑 Stop Generation:** Button to interrupt AI output at any time.
+-   [ ] **📝 Auto-Summary:** Automatically generate conversation titles based on chat content and display a history list in the sidebar.
+-   [ ] **🌊 Streaming Response:** Optimize typewriter effect to reduce perceived latency.
+-   [ ] **🔗 Source Citation:** Clickable citation badges in answers that jump to the corresponding note paragraph.
+
+---
 
 ## 🤝 Contributing
 
 Issues and Pull Requests are welcome!
 
 -   **Frontend Issues:** Please submit to this repository.
--   **Backend/Algorithm Issues:** Please submit to the [Backend Repository](https://github.com/XinYaoDev/obsidian-rag-backend).
+-   **Backend/Algo Issues:** Please submit to the [Backend Repository](https://github.com/XinYaoDev/obsidian-rag-backend).
 
 ## 📄 License
 

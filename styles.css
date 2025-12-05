@@ -645,3 +645,133 @@
 .session-rename-input:focus {
     box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
 }
+
+/* =========================================
+   思考过程折叠面板样式
+========================================= */
+
+/* 思考过程区域外层容器 */
+.thinking-panel {
+    margin-bottom: 12px;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+/* 折叠面板头部（可点击区域） */
+.thinking-panel__header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    background-color: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s ease;
+    font-size: 0.85em;
+    color: var(--text-muted);
+}
+
+.thinking-panel__header:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+/* 展开/收起图标容器 */
+.thinking-panel__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.thinking-panel__icon svg {
+    width: 14px;
+    height: 14px;
+    color: var(--text-muted);
+}
+
+/* 标题文字 */
+.thinking-panel__title {
+    font-weight: 500;
+    flex-grow: 1;
+}
+
+/* 思考内容区域 */
+.thinking-panel__content {
+    background-color: var(--background-primary-alt);
+    border: 1px solid var(--background-modifier-border);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    font-size: 0.85em;
+    color: var(--text-muted);
+    line-height: 1.5;
+    overflow-y: auto;
+    transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out, padding 0.3s ease-in-out;
+}
+
+/* 收起状态 */
+.thinking-panel__content--collapsed {
+    max-height: 0;
+    opacity: 0;
+    padding: 0;
+    border: none;
+}
+
+/* 展开状态 */
+.thinking-panel__content--expanded {
+    max-height: 500px;
+    opacity: 1;
+    padding: 10px 12px;
+}
+
+/* 思考内容区域的 Markdown 紧凑样式 */
+.thinking-panel__content p {
+    margin-block-start: 4px !important;
+    margin-block-end: 4px !important;
+}
+
+.thinking-panel__content > *:first-child {
+    margin-top: 0 !important;
+}
+
+.thinking-panel__content > *:last-child {
+    margin-bottom: 0 !important;
+}
+
+.thinking-panel__content ul,
+.thinking-panel__content ol {
+    margin-block-start: 4px !important;
+    margin-block-end: 4px !important;
+    padding-inline-start: 1.5em !important;
+}
+
+.thinking-panel__content li {
+    margin: 0 !important;
+}
+
+.thinking-panel__content pre {
+    margin: 6px 0 !important;
+    padding: 6px !important;
+    background-color: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.thinking-panel__content code {
+    background-color: var(--background-primary);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+.thinking-panel__content h1,
+.thinking-panel__content h2,
+.thinking-panel__content h3 {
+    margin-block-start: 8px !important;
+    margin-block-end: 4px !important;
+    font-size: 1em !important;
+    line-height: 1.2;
+}

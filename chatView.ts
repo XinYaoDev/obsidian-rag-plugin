@@ -344,11 +344,28 @@ export class ChatView extends ItemView {
                 const result = await response.json();
 
                 if (response.ok && result.success) {
-                    // 显示并保存 AI 回复
-                    const aiContent = result.data;
-                    await this.appendMessage(messageHistory, aiContent, 'ai');
+                    // 解析新的响应数据结构（支持向后兼容）
+                    let answer: string;
+                    let thinking: string | null = null;
                     
-                    this.sessionManager.addMessage({ role: 'assistant', content: aiContent });
+                    if (typeof result.data === 'string') {
+                        // 向后兼容：旧格式（纯字符串）
+                        answer = result.data;
+                    } else if (typeof result.data === 'object' && result.data !== null) {
+                        // 新格式：包含 answer 和 thinking 的对象
+                        answer = result.data.answer || '';
+                        thinking = result.data.thinking || null;
+                        console.log('收到AI回复，包含思考过程:', !!thinking);
+                    } else {
+                        // 数据格式异常
+                        throw new Error('数据格式异常');
+                    }
+                    
+                    // 显示 AI 回复（传递 thinking 参数）
+                    await this.appendMessage(messageHistory, answer, 'ai', false, false, thinking);
+                    
+                    // 仅保存 answer 到会话历史（思考过程不保存）
+                    this.sessionManager.addMessage({ role: 'assistant', content: answer });
                     await this.sessionManager.saveSession(this.sessionManager.getCurrentSession()!);
                     
                     // 成功后清空撤回状态
@@ -513,7 +530,14 @@ export class ChatView extends ItemView {
     // ============================================================
     // 辅助方法：渲染 Markdown
     // ============================================================
-    private async appendMessage(container: HTMLElement, text: string, type: 'user' | 'ai', isLoading = false, isError = false) {
+    private async appendMessage(
+        container: HTMLElement, 
+        text: string, 
+        type: 'user' | 'ai', 
+        isLoading = false, 
+        isError = false,
+        thinking: string | null = null  // 新增：思考过程参数
+    ) {
         const msgWrapper = container.createEl('div', {
             cls: `chat-message-wrapper ${type === 'user' ? 'user' : 'ai'}`
         });
@@ -526,10 +550,80 @@ export class ChatView extends ItemView {
             msgBubble.addClass('loading');
             setIcon(msgBubble, 'loader-2');
         } else {
+            // 如果是AI消息且包含思考过程，先渲染思考面板
+            if (type === 'ai' && thinking && thinking.trim()) {
+                console.debug('渲染思考面板');
+                await this.renderThinkingPanel(msgBubble, thinking);
+            }
+            
+            // 渲染回答内容
             await MarkdownRenderer.render(this.app, text, msgBubble, '', this);
         }
 
         container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
         return msgWrapper;
+    }
+    
+    // ============================================================
+    // 渲染思考过程折叠面板
+    // ============================================================
+    private async renderThinkingPanel(container: HTMLElement, thinking: string) {
+        // 创建思考过程区域外层容器
+        const thinkingPanel = container.createEl('div', {
+            cls: 'thinking-panel'
+        });
+        
+        // 创建折叠面板头部（可点击）
+        const header = thinkingPanel.createEl('div', {
+            cls: 'thinking-panel__header'
+        });
+        
+        // 创建图标容器
+        const iconContainer = header.createEl('span', {
+            cls: 'thinking-panel__icon'
+        });
+        setIcon(iconContainer, 'chevron-right');  // 默认收起状态
+        
+        // 创建标题
+        header.createEl('span', {
+            cls: 'thinking-panel__title',
+            text: '思考过程'
+        });
+        
+        // 创建内容区域（默认隐藏）
+        const content = thinkingPanel.createEl('div', {
+            cls: 'thinking-panel__content thinking-panel__content--collapsed'
+        });
+        
+        // 渲染思考内容的 Markdown
+        try {
+            await MarkdownRenderer.render(this.app, thinking, content, '', this);
+        } catch (e) {
+            console.error('思考内容 Markdown 渲染失败:', e);
+            // 降级为纯文本显示
+            content.setText(thinking);
+        }
+        
+        // 绑定点击事件，切换展开/收起状态
+        let isExpanded = false;
+        header.addEventListener('click', () => {
+            isExpanded = !isExpanded;
+            
+            if (isExpanded) {
+                // 展开状态
+                content.removeClass('thinking-panel__content--collapsed');
+                content.addClass('thinking-panel__content--expanded');
+                iconContainer.empty();
+                setIcon(iconContainer, 'chevron-down');
+                console.debug('思考面板已展开');
+            } else {
+                // 收起状态
+                content.removeClass('thinking-panel__content--expanded');
+                content.addClass('thinking-panel__content--collapsed');
+                iconContainer.empty();
+                setIcon(iconContainer, 'chevron-right');
+                console.debug('思考面板已收起');
+            }
+        });
     }
 }
