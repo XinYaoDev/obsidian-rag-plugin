@@ -54,12 +54,12 @@ export class ChatView extends ItemView {
         });
         setIcon(newBtn, 'plus');
 
-        // 删除当前会话按钮
-        const deleteBtn = sessionActions.createEl('button', {
-            cls: 'session-action-btn delete',
-            attr: { 'aria-label': '删除当前会话' }
+        // 回收站按钮（替换原来的删除当前会话按钮）
+        const trashBtn = sessionActions.createEl('button', {
+            cls: 'session-action-btn',
+            attr: { 'aria-label': '回收站' }
         });
-        setIcon(deleteBtn, 'trash');
+        setIcon(trashBtn, 'archive'); // 使用 archive 图标，表示归档/存储
 
         // 清空当前会话按钮
         const clearBtn = sessionActions.createEl('button', {
@@ -148,24 +148,15 @@ export class ChatView extends ItemView {
                 // 删除按钮事件
                 delBtn.addEventListener('click', async (e) => {
                     e.stopPropagation();
-                    await this.deleteSessionWithConfirm(session.sessionId, container, messageHistory);
-                    dropdownEl?.remove();
-                    dropdownEl = null;
+                    await this.deleteSessionWithConfirm(session.sessionId, container, messageHistory, () => {
+                        // 刷新会话列表，保持下拉菜单打开
+                        if (dropdownEl) {
+                            refreshSessionList();
+                        }
+                    });
                 });
             }
 
-            // 分隔线
-            dropdownEl.createEl('div', { cls: 'session-divider' });
-
-            // 新建会话按钮
-            const newSessionBtn = dropdownEl.createEl('button', { cls: 'new-session-btn' });
-            setIcon(newSessionBtn, 'plus');
-            newSessionBtn.createEl('span', { text: '新建会话' });
-            newSessionBtn.addEventListener('click', async () => {
-                await this.createNewSession(container, messageHistory);
-                dropdownEl?.remove();
-                dropdownEl = null;
-            });
         };
 
         // 点击会话列表按钮显示下拉菜单
@@ -195,12 +186,9 @@ export class ChatView extends ItemView {
             await this.createNewSession(container, messageHistory);
         });
 
-        // 删除当前会话按钮事件
-        deleteBtn.addEventListener('click', async () => {
-            const currentSessionId = this.sessionManager.getCurrentSessionId();
-            if (currentSessionId) {
-                await this.deleteSessionWithConfirm(currentSessionId, container, messageHistory);
-            }
+        // 回收站按钮事件
+        trashBtn.addEventListener('click', async () => {
+            await this.showTrashDialog(container, messageHistory, refreshSessionList);
         });
 
         // 清空当前会话按钮事件
@@ -452,8 +440,8 @@ export class ChatView extends ItemView {
                 }
 
                 thinkingRenderTimer = setTimeout(() => {
-                    // 直接设置文本内容，不进行 Markdown 渲染
-                    thinkingContent!.setText(thinkingBuffer);
+                    // 保留换行和空格，但不渲染 Markdown 语法
+                    this.renderPlainTextWithLineBreaks(thinkingContent!, thinkingBuffer);
 
                     // 滚动到底部
                     messageHistory.scrollTo({ top: messageHistory.scrollHeight, behavior: 'smooth' });
@@ -538,12 +526,13 @@ export class ChatView extends ItemView {
                     sendBtn.addClass('chat-send-btn');
                     sendBtn.style.borderRadius = '50%'; // 恢复圆形
                     sendBtn.style.backgroundColor = ''; // 清除内联样式
+                    sendBtn.style.color = ''; // 清除文字颜色
                     sendBtn.disabled = false;
                     sendBtn.style.opacity = '1';
                     sendBtn.style.cursor = 'pointer';
                     
-                    // 移除终止按钮的点击事件
-                    sendBtn.onclick = null;
+                    // ⚠️ 重要：重新绑定发送按钮的点击事件
+                    sendBtn.onclick = sendMessage;
                 };
 
                 // 绑定终止按钮点击事件
@@ -599,10 +588,13 @@ export class ChatView extends ItemView {
                             sendBtn.removeClass('chat-stop-btn');
                             sendBtn.addClass('chat-send-btn');
                             sendBtn.style.borderRadius = '50%';
+                            sendBtn.style.backgroundColor = ''; // 清除内联样式
+                            sendBtn.style.color = ''; // 清除文字颜色
                             sendBtn.disabled = false;
                             sendBtn.style.opacity = '1';
                             sendBtn.style.cursor = 'pointer';
-                            sendBtn.onclick = null; // 移除终止事件
+                            // ⚠️ 重要：重新绑定发送按钮的点击事件
+                            sendBtn.onclick = sendMessage;
                             return;
                         }
 
@@ -620,10 +612,13 @@ export class ChatView extends ItemView {
                         sendBtn.removeClass('chat-stop-btn');
                         sendBtn.addClass('chat-send-btn');
                         sendBtn.style.borderRadius = '50%';
+                        sendBtn.style.backgroundColor = ''; // 清除内联样式
+                        sendBtn.style.color = ''; // 清除文字颜色
                         sendBtn.disabled = false;
                         sendBtn.style.opacity = '1';
                         sendBtn.style.cursor = 'pointer';
-                        sendBtn.onclick = null; // 移除终止事件
+                        // ⚠️ 重要：重新绑定发送按钮的点击事件
+                        sendBtn.onclick = sendMessage;
                     },
                     // onComplete 回调
                     async () => {
@@ -642,9 +637,9 @@ export class ChatView extends ItemView {
                         // 最终渲染回答内容
                         renderAnswer();
 
-                        // 最终渲染思考内容（如果有）- 纯文本显示，不渲染 Markdown
+                        // 最终渲染思考内容（如果有）- 保留换行和空格，但不渲染 Markdown
                         if (thinkingContent && thinkingBuffer) {
-                            thinkingContent.setText(thinkingBuffer);
+                            this.renderPlainTextWithLineBreaks(thinkingContent, thinkingBuffer);
                         }
 
                         // 移除思考面板的活跃状态
@@ -673,9 +668,19 @@ export class ChatView extends ItemView {
                         this.lastUserMessageElement = null;
 
                         // 恢复发送按钮
+                        sendBtn.empty();
+                        setIcon(sendBtn, 'send');
+                        sendBtn.setAttribute('aria-label', '发送');
+                        sendBtn.removeClass('chat-stop-btn');
+                        sendBtn.addClass('chat-send-btn');
+                        sendBtn.style.borderRadius = '50%';
+                        sendBtn.style.backgroundColor = ''; // 清除内联样式
+                        sendBtn.style.color = ''; // 清除文字颜色
                         sendBtn.disabled = false;
                         sendBtn.style.opacity = '1';
                         sendBtn.style.cursor = 'pointer';
+                        // ⚠️ 重要：重新绑定发送按钮的点击事件
+                        sendBtn.onclick = sendMessage;
                     }
                 );
 
@@ -747,18 +752,27 @@ export class ChatView extends ItemView {
         }
     }
 
-    // 删除会话（带确认）
-    private async deleteSessionWithConfirm(sessionId: string, container: Element, messageHistory: HTMLElement) {
+    // 删除会话（移到回收站，无需确认）
+    private async deleteSessionWithConfirm(
+        sessionId: string, 
+        container: Element, 
+        messageHistory: HTMLElement,
+        onDeleted?: () => void
+    ) {
         const session = this.sessionManager.getAllSessions().find(s => s.sessionId === sessionId);
-        if (!session) return;
-
-        // 确认对话框
-        const confirmed = confirm(`确定删除会话「${session.sessionName}」吗？此操作不可撤销。`);
-        if (!confirmed) return;
+        if (!session) {
+            new Notice('会话不存在');
+            return;
+        }
 
         try {
             const wasCurrentSession = sessionId === this.sessionManager.getCurrentSessionId();
-            await this.sessionManager.deleteSession(sessionId);
+            const success = await this.sessionManager.deleteSession(sessionId);
+            
+            if (!success) {
+                new Notice('删除会话失败：操作未完成');
+                return;
+            }
 
             // 如果删除的是当前会话，需要刷新界面
             if (wasCurrentSession) {
@@ -773,11 +787,167 @@ export class ChatView extends ItemView {
                 messageHistory.scrollTo({ top: messageHistory.scrollHeight });
             }
 
-            new Notice('会话已删除');
+            // 调用回调函数刷新会话列表
+            if (onDeleted) {
+                onDeleted();
+            }
         } catch (e) {
             console.error('删除会话失败:', e);
-            new Notice('删除会话失败');
+            const errorMessage = e instanceof Error ? e.message : '未知错误';
+            new Notice(`删除会话失败: ${errorMessage}`);
         }
+    }
+
+    // 显示回收站对话框
+    private async showTrashDialog(
+        container: Element, 
+        messageHistory: HTMLElement,
+        refreshSessionList: () => void
+    ) {
+        const trashItems = await this.sessionManager.getTrashItems();
+        
+        if (trashItems.length === 0) {
+            new Notice('回收站为空');
+            return;
+        }
+
+        // 创建模态对话框
+        const modal = document.createElement('div');
+        modal.className = 'trash-modal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        `;
+
+        const dialog = document.createElement('div');
+        dialog.className = 'trash-dialog';
+        dialog.style.cssText = `
+            background: var(--background-primary);
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 70vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        `;
+
+        const title = document.createElement('h3');
+        title.textContent = `回收站 (${trashItems.length} 个会话)`;
+        title.style.cssText = 'margin: 0 0 16px 0; font-size: 1.2em;';
+        dialog.appendChild(title);
+
+        const list = document.createElement('div');
+        list.style.cssText = 'display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;';
+
+        for (const item of trashItems) {
+            const itemEl = document.createElement('div');
+            itemEl.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 12px;
+                background: var(--background-secondary);
+                border-radius: 6px;
+            `;
+
+            const info = document.createElement('div');
+            info.style.cssText = 'flex: 1;';
+            const name = document.createElement('div');
+            name.textContent = item.sessionName;
+            name.style.cssText = 'font-weight: 500; margin-bottom: 4px;';
+            const time = document.createElement('div');
+            const deletedDate = new Date(item.deletedAt);
+            const daysAgo = Math.floor((Date.now() - item.deletedAt) / (1000 * 60 * 60 * 24));
+            time.textContent = `删除于 ${deletedDate.toLocaleDateString()} ${deletedDate.toLocaleTimeString()} (${daysAgo} 天前)`;
+            time.style.cssText = 'font-size: 0.85em; color: var(--text-muted);';
+            info.appendChild(name);
+            info.appendChild(time);
+
+            const actions = document.createElement('div');
+            actions.style.cssText = 'display: flex; gap: 8px;';
+
+            const restoreBtn = document.createElement('button');
+            restoreBtn.textContent = '恢复';
+            restoreBtn.style.cssText = `
+                padding: 6px 12px;
+                border: none;
+                border-radius: 4px;
+                background: var(--interactive-accent);
+                color: var(--text-on-accent);
+                cursor: pointer;
+                font-size: 0.9em;
+            `;
+            restoreBtn.addEventListener('click', async () => {
+                const success = await this.sessionManager.restoreFromTrash(item.sessionId);
+                if (success) {
+                    new Notice('会话已恢复');
+                    modal.remove();
+                    refreshSessionList();
+                } else {
+                    new Notice('恢复失败');
+                }
+            });
+
+            actions.appendChild(restoreBtn);
+            itemEl.appendChild(info);
+            itemEl.appendChild(actions);
+            list.appendChild(itemEl);
+        }
+
+        dialog.appendChild(list);
+
+        // 清空回收站按钮
+        const clearBtn = document.createElement('button');
+        clearBtn.textContent = '清空回收站';
+        clearBtn.style.cssText = `
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            background: var(--background-modifier-error);
+            color: var(--text-on-accent);
+            cursor: pointer;
+            font-weight: 500;
+        `;
+        clearBtn.addEventListener('click', async () => {
+            const confirmed = confirm(`确定要清空回收站吗？这将永久删除 ${trashItems.length} 个会话，此操作不可恢复。`);
+            if (confirmed) {
+                try {
+                    const success = await this.sessionManager.clearAllTrash();
+                    if (success) {
+                        new Notice('回收站已清空');
+                        modal.remove();
+                        refreshSessionList();
+                    } else {
+                        new Notice('清空回收站失败');
+                    }
+                } catch (e) {
+                    console.error('清空回收站失败:', e);
+                    new Notice('清空回收站失败');
+                }
+            }
+        });
+
+        dialog.appendChild(clearBtn);
+        modal.appendChild(dialog);
+
+        // 点击背景关闭
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+
+        document.body.appendChild(modal);
     }
 
     // 重命名会话对话框
@@ -1138,8 +1308,8 @@ export class ChatView extends ItemView {
             cls: 'thinking-panel__content thinking-panel__content--collapsed'
         });
 
-        // 渲染思考内容 - 纯文本显示，不渲染 Markdown
-        content.setText(thinking);
+        // 渲染思考内容 - 保留换行和空格，但不渲染 Markdown
+        this.renderPlainTextWithLineBreaks(content, thinking);
 
         // 绑定点击事件，切换展开/收起状态
         let isExpanded = false;
@@ -1162,6 +1332,47 @@ export class ChatView extends ItemView {
                 console.debug('思考面板已收起');
             }
         });
+    }
+
+    /**
+     * 渲染纯文本内容，保留换行和空格，但不渲染 Markdown 语法
+     * 用于深度思考面板的显示
+     */
+    private renderPlainTextWithLineBreaks(container: HTMLElement, text: string): void {
+        // 转义 HTML 特殊字符，防止 XSS
+        const escapeHtml = (str: string): string => {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        };
+
+        // 移除 Markdown 语法标记（但保留换行和空格）
+        let processed = text
+            // 移除代码块标记
+            .replace(/```[\s\S]*?```/g, '')
+            .replace(/`[^`]+`/g, '')
+            // 移除加粗标记
+            .replace(/\*\*([^*]+)\*\*/g, '$1')
+            .replace(/\*([^*]+)\*/g, '$1')
+            // 移除斜体标记
+            .replace(/_([^_]+)_/g, '$1')
+            // 移除链接标记
+            .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+            // 移除标题标记
+            .replace(/^#{1,6}\s+/gm, '')
+            // 移除列表标记
+            .replace(/^[\s]*[-*+]\s+/gm, '')
+            .replace(/^[\s]*\d+\.\s+/gm, '');
+
+        // 转义 HTML 并保留换行
+        const escaped = escapeHtml(processed);
+        
+        // 设置样式以保留换行和空格
+        container.style.whiteSpace = 'pre-wrap';
+        container.style.wordBreak = 'break-word';
+        
+        // 使用 innerHTML 保留换行（已转义，安全）
+        container.innerHTML = escaped;
     }
 
     // ============================================================
@@ -1193,9 +1404,16 @@ export class ChatView extends ItemView {
 
     // 为代码块添加包裹容器、Header Bar和复制按钮
     private wrapCodeBlocks(container: HTMLElement) {
-        const codeBlocks = container.querySelectorAll('pre');
+        const codeBlocks = container.querySelectorAll('pre:not(.code-block-wrapper pre)');
 
-        codeBlocks.forEach((pre) => {
+        codeBlocks.forEach((preEl) => {
+            const pre = preEl as HTMLElement;
+            
+            // 检查是否已经被包装过（避免重复包装）
+            if (pre.parentElement?.classList.contains('code-block-wrapper')) {
+                return;
+            }
+
             // 创建包裹容器
             const wrapper = document.createElement('div');
             wrapper.className = 'code-block-wrapper';
@@ -1214,7 +1432,27 @@ export class ChatView extends ItemView {
                     const rawLang = langClass.replace('language-', '');
                     language = this.languageMap[rawLang.toLowerCase()] ||
                         rawLang.charAt(0).toUpperCase() + rawLang.slice(1);
+                    console.debug('提取到语言标识:', rawLang, '->', language);
+                    
+                    // 清理代码块第一行可能存在的语言标识文本
+                    // 如果第一行只包含语言标识（可能是预处理导致的），移除它
+                    const codeText = codeEl.textContent || '';
+                    const firstLine = codeText.split('\n')[0].trim();
+                    if (firstLine === rawLang || firstLine.toLowerCase() === rawLang.toLowerCase()) {
+                        // 移除第一行
+                        const lines = codeText.split('\n');
+                        if (lines.length > 1) {
+                            codeEl.textContent = lines.slice(1).join('\n');
+                        } else {
+                            codeEl.textContent = '';
+                        }
+                        console.debug('已清理代码块第一行的语言标识文本');
+                    }
+                } else {
+                    console.debug('未找到语言类名，codeEl.classList:', classList);
                 }
+            } else {
+                console.debug('未找到 code 元素');
             }
 
             // 左侧：语言标签
@@ -1228,7 +1466,9 @@ export class ChatView extends ItemView {
             header.appendChild(copyBtn);
 
             // 组装结构
-            pre.parentNode?.insertBefore(wrapper, pre);
+            if (pre.parentElement) {
+                pre.parentElement.insertBefore(wrapper, pre);
+            }
             wrapper.appendChild(header);
             wrapper.appendChild(pre);
         });
@@ -1355,6 +1595,7 @@ export class ChatView extends ItemView {
      * 主要处理未闭合的代码块，避免 Markdown 解析失败
      * 
      * 注意：这个方法只修改用于渲染的字符串副本，不会修改原始的 answerBuffer
+     * 尽量少修改，避免破坏已正确格式化的代码块
      */
     private preprocessIncompleteMarkdown(markdown: string): string {
         if (!markdown) return markdown;
@@ -1384,15 +1625,12 @@ export class ChatView extends ItemView {
             }
         }
 
-        // 2. 修复代码块标记格式：确保代码块标记前后有适当的换行
-        // 这有助于 Markdown 解析器正确识别代码块
-        // 代码块开始标记：确保前面有换行（除非在行首）
-        processed = processed.replace(/([^\n\r\s])```([a-zA-Z0-9]*)/g, '$1\n```$2');
-        // 代码块结束标记：确保后面有换行（除非在行尾）
-        processed = processed.replace(/```([^\n\r\s])/g, '```\n$1');
-
-        // 3. 清理多余的空行（避免影响渲染，但保留必要的空行）
-        processed = processed.replace(/\n{4,}/g, '\n\n\n');
+        // 2. 只在必要时修复代码块标记格式
+        // 避免过度修改已正确格式化的代码块
+        // 只在代码块标记紧邻非换行字符时才添加换行（避免破坏格式）
+        // 注意：这个正则只匹配紧邻非换行字符的情况，不会影响已经正确格式化的代码块
+        processed = processed.replace(/([^\n\r])```([a-zA-Z0-9+\-._]*\n)/g, '$1\n```$2');
+        processed = processed.replace(/([^\n\r])```([a-zA-Z0-9+\-._]*$)/gm, '$1\n```$2');
 
         return processed;
     }
