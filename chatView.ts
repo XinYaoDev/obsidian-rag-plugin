@@ -444,12 +444,18 @@ export class ChatView extends ItemView {
                     try {
                         // 清空并重新渲染
                         thinkingContent!.empty();
-                        MarkdownRenderer.render(this.app, thinkingBuffer, thinkingContent!, '', this).catch((e) => {
+                        // 转义代码块标记后再渲染（保留内容但不渲染为代码块）
+                        const processedThinking = this.escapeCodeBlocksInMarkdown(thinkingBuffer);
+                        MarkdownRenderer.render(this.app, processedThinking, thinkingContent!, '', this).then(() => {
+                            // 渲染后移除所有代码块元素
+                            this.removeCodeBlocksFromThinkingPanel(thinkingContent!);
+                        }).catch((e) => {
                             console.error('思考内容渲染失败:', e);
-                            thinkingContent!.setText(thinkingBuffer);
+                            thinkingContent!.setText(processedThinking);
                         });
                     } catch (e) {
-                        thinkingContent!.setText(thinkingBuffer);
+                        const processedThinking = this.escapeCodeBlocksInMarkdown(thinkingBuffer);
+                        thinkingContent!.setText(processedThinking);
                     }
 
                     // 滚动到底部
@@ -546,9 +552,14 @@ export class ChatView extends ItemView {
                         if (thinkingContent && thinkingBuffer) {
                             try {
                                 thinkingContent.empty();
-                                await MarkdownRenderer.render(this.app, thinkingBuffer, thinkingContent, '', this);
+                                // 转义代码块标记后再渲染（保留内容但不渲染为代码块）
+                                const processedThinking = this.escapeCodeBlocksInMarkdown(thinkingBuffer);
+                                await MarkdownRenderer.render(this.app, processedThinking, thinkingContent, '', this);
+                                // 渲染后移除所有代码块元素
+                                this.removeCodeBlocksFromThinkingPanel(thinkingContent);
                             } catch (e) {
-                                thinkingContent.setText(thinkingBuffer);
+                                const processedThinking = this.escapeCodeBlocksInMarkdown(thinkingBuffer);
+                                thinkingContent.setText(processedThinking);
                             }
                         }
 
@@ -1199,6 +1210,107 @@ export class ChatView extends ItemView {
     }
 
     // ============================================================
+    // 预处理思考内容：转义代码块标记
+    // ============================================================
+    
+    /**
+     * 从思考面板中移除所有代码块元素，将其转换为纯文本
+     * 处理 Obsidian 可能渲染的各种代码块格式（三个反引号、缩进代码块等）
+     */
+    private removeCodeBlocksFromThinkingPanel(container: HTMLElement): void {
+        // 1. 移除代码块包装器（code-block-wrapper）及其内容
+        // 注意：使用 Array.from 创建数组副本，避免在遍历时修改 DOM 导致的问题
+        const codeBlockWrappers = Array.from(container.querySelectorAll('.code-block-wrapper'));
+        codeBlockWrappers.forEach((wrapper) => {
+            const codeEl = wrapper.querySelector('code');
+            if (codeEl) {
+                // 提取代码内容（保留换行和空格）
+                const codeText = codeEl.textContent || '';
+                // 创建纯文本节点替换，前后添加换行以保持格式
+                const textNode = document.createTextNode('\n' + codeText + '\n');
+                wrapper.parentNode?.replaceChild(textNode, wrapper);
+            } else {
+                wrapper.remove();
+            }
+        });
+
+        // 2. 移除所有 <pre><code> 代码块（包括 Obsidian 渲染的缩进代码块）
+        // 注意：先查找所有 pre 元素，因为替换会改变 DOM 结构
+        const preElements = Array.from(container.querySelectorAll('pre'));
+        preElements.forEach((pre) => {
+            // 跳过已经被包装器包裹的 pre（应该已经被步骤1处理）
+            if (pre.closest('.code-block-wrapper')) {
+                return;
+            }
+
+            const codeEl = pre.querySelector('code');
+            if (codeEl) {
+                // 提取代码内容（保留换行和空格）
+                const codeText = codeEl.textContent || '';
+                // 创建纯文本节点替换，前后添加换行以保持格式
+                const textNode = document.createTextNode('\n' + codeText + '\n');
+                pre.parentNode?.replaceChild(textNode, pre);
+            } else {
+                // 如果没有 code 元素，直接提取 pre 的文本
+                const preText = pre.textContent || '';
+                const textNode = document.createTextNode('\n' + preText + '\n');
+                pre.parentNode?.replaceChild(textNode, pre);
+            }
+        });
+
+        // 3. 移除行内代码标记（<code> 元素，但不是代码块中的）
+        // 注意：此时 pre 中的 code 应该已经被移除，所以这里只处理行内代码
+        const inlineCodeElements = Array.from(container.querySelectorAll('code'));
+        inlineCodeElements.forEach((codeEl) => {
+            // 跳过已经被移除的代码块中的 code
+            if (codeEl.closest('pre') || codeEl.closest('.code-block-wrapper')) {
+                return;
+            }
+            const codeText = codeEl.textContent || '';
+            const textNode = document.createTextNode(codeText);
+            codeEl.parentNode?.replaceChild(textNode, codeEl);
+        });
+    }
+    /**
+     * 转义 Markdown 中的代码块标记，使其不被渲染为代码块
+     * 保留代码块的原始文本内容，但以纯文本形式显示
+     * 用于思考内容的渲染，避免显示代码相关部分
+     */
+    private escapeCodeBlocksInMarkdown(markdown: string): string {
+        if (!markdown) return markdown;
+
+        let result = '';
+        let i = 0;
+
+        // 手动遍历字符串，转义代码块标记
+        while (i < markdown.length) {
+            // 检查是否是三个反引号（代码块标记）
+            if (i + 2 < markdown.length && 
+                markdown[i] === '`' && 
+                markdown[i + 1] === '`' && 
+                markdown[i + 2] === '`' &&
+                (i === 0 || markdown[i - 1] !== '\\')) {
+                // 转义三个反引号
+                result += '\\`\\`\\`';
+                i += 3;
+            }
+            // 检查是否是单个反引号（行内代码标记）
+            else if (markdown[i] === '`' && (i === 0 || markdown[i - 1] !== '\\')) {
+                // 转义单个反引号
+                result += '\\`';
+                i += 1;
+            }
+            else {
+                // 普通字符，直接添加
+                result += markdown[i];
+                i += 1;
+            }
+        }
+
+        return result;
+    }
+
+    // ============================================================
     // 渲染思考过程折叠面板
     // ============================================================
     private async renderThinkingPanel(container: HTMLElement, thinking: string) {
@@ -1229,13 +1341,18 @@ export class ChatView extends ItemView {
             cls: 'thinking-panel__content thinking-panel__content--collapsed'
         });
 
-        // 渲染思考内容的 Markdown
+        // 渲染思考内容的 Markdown（转义代码块标记，保留内容但不渲染为代码块）
         try {
-            await MarkdownRenderer.render(this.app, thinking, content, '', this);
+            // 转义代码块标记后再渲染
+            const processedThinking = this.escapeCodeBlocksInMarkdown(thinking);
+            await MarkdownRenderer.render(this.app, processedThinking, content, '', this);
+            // 渲染后移除所有代码块元素（包括 Obsidian 可能渲染的缩进代码块）
+            this.removeCodeBlocksFromThinkingPanel(content);
         } catch (e) {
             console.error('思考内容 Markdown 渲染失败:', e);
             // 降级为纯文本显示
-            content.setText(thinking);
+            const processedThinking = this.escapeCodeBlocksInMarkdown(thinking);
+            content.setText(processedThinking);
         }
 
         // 绑定点击事件，切换展开/收起状态
