@@ -1724,10 +1724,9 @@ export class ChatView extends ItemView {
 
         // 2. 修复代码块标记格式：确保代码块标记前后有适当的换行
         // 这有助于 Markdown 解析器正确识别代码块
-        // 代码块开始标记：确保前面有换行（除非在行首）
-        processed = processed.replace(/([^\n\r\s])```([a-zA-Z0-9]*)/g, '$1\n```$2');
-        // 代码块结束标记：确保后面有换行（除非在行尾）
-        processed = processed.replace(/```([^\n\r\s])/g, '```\n$1');
+        // 代码块开始标记：确保前面有换行（除非在行首或已经是换行符）
+        // 只匹配代码块前不是换行符的情况，避免破坏代码块结构
+        processed = processed.replace(/([^\n\r])```/g, '$1\n```');
 
         // 3. 清理多余的空行（避免影响渲染，但保留必要的空行）
         processed = processed.replace(/\n{4,}/g, '\n\n\n');
