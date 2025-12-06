@@ -12,6 +12,11 @@ export class ChatView extends ItemView {
     // 失败撤回状态追踪
     private lastUserInput: string | null = null;
     private lastUserMessageElement: HTMLElement | null = null;
+    
+    // 输入历史管理（最近5条）
+    private inputHistory: string[] = [];
+    private inputHistoryIndex: number = -1; // 当前浏览的历史索引，-1 表示不在浏览历史
+    private currentInputBeforeHistory: string = ''; // 浏览历史前的输入内容
 
     constructor(leaf: WorkspaceLeaf, plugin: RagPlugin) {
         super(leaf);
@@ -263,7 +268,24 @@ export class ChatView extends ItemView {
                 return;
             }
 
-            // 2. 如果只按了 Enter (没有按 Shift)
+            // 2. 处理上下键浏览输入历史
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                // 如果输入框有内容且不在历史浏览模式，保存当前输入
+                if (this.inputHistoryIndex === -1 && inputEl.value.trim()) {
+                    this.currentInputBeforeHistory = inputEl.value;
+                }
+                
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    this.navigateInputHistory(inputEl, 'up');
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    this.navigateInputHistory(inputEl, 'down');
+                }
+                return;
+            }
+
+            // 3. 如果只按了 Enter (没有按 Shift)
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault(); // 阻止默认的换行行为
                 sendMessage();      // 执行发送
@@ -293,6 +315,9 @@ export class ChatView extends ItemView {
 
             // 保存用户输入，用于失败撤回和终止恢复
             this.lastUserInput = content;
+            
+            // 添加到输入历史（最多保留5条）
+            this.addToInputHistory(content);
 
             // ⚠️ 切换按钮为终止按钮
             sendBtn.empty();
@@ -1633,5 +1658,66 @@ export class ChatView extends ItemView {
         processed = processed.replace(/([^\n\r])```([a-zA-Z0-9+\-._]*$)/gm, '$1\n```$2');
 
         return processed;
+    }
+
+    /**
+     * 添加到输入历史（最多保留5条）
+     */
+    private addToInputHistory(content: string): void {
+        // 如果与最后一条历史相同，不重复添加
+        if (this.inputHistory.length > 0 && this.inputHistory[0] === content) {
+            return;
+        }
+        
+        // 添加到数组开头
+        this.inputHistory.unshift(content);
+        
+        // 只保留最近5条
+        if (this.inputHistory.length > 5) {
+            this.inputHistory = this.inputHistory.slice(0, 5);
+        }
+        
+        // 重置历史索引
+        this.inputHistoryIndex = -1;
+        this.currentInputBeforeHistory = '';
+    }
+
+    /**
+     * 浏览输入历史
+     */
+    private navigateInputHistory(inputEl: HTMLTextAreaElement, direction: 'up' | 'down'): void {
+        if (this.inputHistory.length === 0) {
+            return;
+        }
+
+        if (direction === 'up') {
+            // 向上浏览（更早的历史）
+            if (this.inputHistoryIndex < this.inputHistory.length - 1) {
+                this.inputHistoryIndex++;
+                inputEl.value = this.inputHistory[this.inputHistoryIndex];
+                // 将光标移到末尾
+                setTimeout(() => {
+                    inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
+                }, 0);
+            }
+        } else {
+            // 向下浏览（更新的历史）
+            if (this.inputHistoryIndex > 0) {
+                this.inputHistoryIndex--;
+                inputEl.value = this.inputHistory[this.inputHistoryIndex];
+                // 将光标移到末尾
+                setTimeout(() => {
+                    inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
+                }, 0);
+            } else if (this.inputHistoryIndex === 0) {
+                // 回到浏览历史前的输入内容
+                this.inputHistoryIndex = -1;
+                inputEl.value = this.currentInputBeforeHistory;
+                // 将光标移到末尾
+                setTimeout(() => {
+                    inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
+                }, 0);
+            }
+        }
     }
 }
