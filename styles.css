@@ -88,6 +88,13 @@
     /* 防止长单词撑爆容器 */
     overflow-wrap: break-word;
     word-break: break-word;
+    
+    /* 支持文本选择 */
+    user-select: text;
+    cursor: text;
+    
+    /* 相对定位，为复制按钮提供定位上下文 */
+    position: relative;
 }
 
 /* 用户气泡颜色 */
@@ -103,6 +110,8 @@
     border: 1px solid var(--background-modifier-border);
     color: var(--text-normal);
     border-bottom-left-radius: 4px;
+    /* 为全文复制按钮预留空间 */
+    padding-bottom: 48px;
 }
 
 /* 错误消息样式 */
@@ -774,4 +783,194 @@
     margin-block-end: 4px !important;
     font-size: 1em !important;
     line-height: 1.2;
+}
+
+/* =========================================
+   全文复制按钮样式
+========================================= */
+
+/* 全文复制按钮容器 */
+.message-copy-full-btn {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background-color: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    cursor: pointer;
+    opacity: 0.4;
+    transition: all 0.2s ease;
+    font-size: 0.85em;
+    color: var(--text-muted);
+    user-select: none;
+    /* 强制垂直居中 */
+    line-height: 1;
+    height: auto;
+}
+
+/* 悬停状态 */
+.chat-message-bubble.ai:hover .message-copy-full-btn {
+    opacity: 1;
+}
+
+.message-copy-full-btn:hover {
+    background-color: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+/* 成功状态 */
+.message-copy-full-btn.copy-btn--success {
+    color: var(--interactive-accent);
+    border-color: var(--interactive-accent);
+}
+
+/* 按钮图标 */
+.copy-btn-icon {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0;
+    line-height: 1;
+    vertical-align: middle;
+}
+
+.copy-btn-icon svg {
+    width: 14px;
+    height: 14px;
+    display: block !important;
+    vertical-align: middle;
+}
+
+/* 按钮文字 */
+.copy-btn-text {
+    display: inline-flex !important;
+    align-items: center !important;
+    font-weight: 500;
+    white-space: nowrap;
+    line-height: 1 !important;
+    flex-shrink: 0;
+    vertical-align: middle;
+    padding: 0;
+    margin: 0;
+}
+
+/* =========================================
+   代码块包裹容器和复制按钮样式
+========================================= */
+
+/* 代码块外层包裹容器 */
+.code-block-wrapper {
+    position: relative;
+    margin: 8px 0;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--background-modifier-border);
+}
+
+/* 代码块Header Bar */
+.code-block-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: var(--background-secondary);
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+/* 代码语言标签（左侧） */
+.code-language-label {
+    font-size: 0.75em;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    user-select: none;
+}
+
+/* 代码块复制按钮（右侧） */
+.code-copy-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background-color: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.2s ease;
+    font-size: 0.8em;
+    color: var(--text-muted);
+    user-select: none;
+}
+
+/* 悬停时显示复制按钮 */
+.code-block-wrapper:hover .code-copy-btn {
+    opacity: 1;
+}
+
+.code-copy-btn:hover {
+    background-color: var(--background-modifier-hover);
+    border-color: var(--background-modifier-border);
+    color: var(--text-normal);
+}
+
+/* 成功状态 */
+.code-copy-btn.copy-btn--success {
+    opacity: 1;
+    color: var(--interactive-accent);
+    border-color: var(--interactive-accent);
+    background-color: var(--background-modifier-success);
+}
+
+/* 调整代码块本身样式 */
+.code-block-wrapper pre {
+    margin: 0;
+    border-radius: 0;
+    border: none;
+}
+
+/* =========================================
+   隐藏代码块内部的冗余元素
+========================================= */
+
+/* 隐藏代码块内部的语言标签水印（可能由渲染器自动生成） */
+.code-block-wrapper pre::after,
+.code-block-wrapper pre::before,
+.code-block-wrapper code::after,
+.code-block-wrapper code::before {
+    display: none !important;
+    content: none !important;
+}
+
+/* 隐藏Obsidian或第三方插件生成的复制按钮（排除我们自定义的按钮） */
+.code-block-wrapper .copy-code-button,
+.code-block-wrapper .copy-button,
+.code-block-wrapper .clipboard-copy,
+.code-block-wrapper .clipboard-button {
+    display: none !important;
+}
+
+/* 隐藏其他可能的第三方复制按钮（但排除我们的.code-copy-btn和.message-copy-full-btn） */
+.code-block-wrapper button[class*="copy"]:not(.code-copy-btn),
+.code-block-wrapper button[class*="clipboard"] {
+    display: none !important;
+}
+
+/* 隐藏可能的语言标签元素 */
+.code-block-wrapper .language-label:not(.code-language-label),
+.code-block-wrapper .lang-label,
+.code-block-wrapper [data-language]::after,
+.code-block-wrapper [class*="language-"]::after {
+    display: none !important;
+}
+
+/* 确保只有我们自定义的Header中的元素可见 */
+.code-block-wrapper > *:not(.code-block-header):not(pre) {
+    display: none !important;
 }

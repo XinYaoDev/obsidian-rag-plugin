@@ -35,7 +35,14 @@ It is not just a simple AI chat interface. By connecting to a local **Java Backe
     -   Integrated with **DeepSeek R1** / **Qwen QwQ** reasoning models.
     -   Provides an **independent toggle** to enable "Deep Thinking" with one click.
     -   Displays the AI's **Chain of Thought (CoT)**, showing not just the result, but the logical deduction process.
-    -   _Collapsible UI for the thinking process to keep the interface clean._
+
+### 🎨 Interactive Experience (UI/UX) NEW!
+
+-   **📋 Seamless Copying:**
+    -   **Full-Text Copy:** Added a "Copy Full Text" button (icon + label) at the bottom left of AI message bubbles for one-click extraction.
+    -   **Code Optimization:** Code blocks now feature a sleek Header Bar displaying the language tag and a dedicated copy button.
+-   **✨ Text Selection:** Optimized the message bubble interaction layer, ensuring you can freely select and copy any text segment within the chat.
+-   **UI Polish:** Refined visual alignment and button sizing using enhanced Flexbox layouts to maintain a clean and consistent interface.
 
 ### 💾 Session Management
 
@@ -52,7 +59,7 @@ It is not just a simple AI chat interface. By connecting to a local **Java Backe
 
 ## 📸 Screenshots
 
-_(Placeholder for screenshot showing the sidebar chat, Deep Thinking toggle, and expanded reasoning block)_
+_(Placeholder for screenshot showing the sidebar chat, code block header styles, and the full-text copy button)_
 
 ---
 
@@ -112,7 +119,8 @@ After enabling the plugin, go to **Settings -> RAG Assistant**:
 1.  **Open Assistant:** Click the **🤖 Robot Icon** in the left ribbon.
 2.  **Enable Deep Thinking:** (Optional) Toggle the **🧠 Deep Thinking** switch above the input box.
 3.  **Ask Questions:** Type your question and press **Enter** to send.
-4.  **Manage History:** Click the **🗑️ Trash Can** icon in the top toolbar to clear the current context.
+4.  **Copy Content:** Click the icon in the code block header to copy code, or use the button at the bottom of the bubble to copy the full response.
+5.  **Manage History:** Click the **🗑️ Trash Can** icon in the top toolbar to clear the current context.
 
 ---
 
@@ -123,7 +131,7 @@ We are continuously improving the experience. Here is what's coming next:
 -   [x] Basic RAG Conversation & Auto-Sync
 -   [x] **Deep Thinking (CoT) Display & Toggle**
 -   [x] **Conversation History Persistence**
--   [ ] **📋 One-Click Copy:** Support copying code blocks or full AI responses with one click.
+-   [x] **📋 One-Click Copy:** Support copying code blocks or full AI responses with one click.
 -   [ ] **🛑 Stop Generation:** Button to interrupt AI output at any time.
 -   [ ] **📝 Auto-Summary:** Automatically generate conversation titles based on chat content and display a history list in the sidebar.
 -   [ ] **🌊 Streaming Response:** Optimize typewriter effect to reduce perceived latency.

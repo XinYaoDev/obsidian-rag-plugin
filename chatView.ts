@@ -545,6 +545,11 @@ export class ChatView extends ItemView {
         const msgBubble = msgWrapper.createEl('div', {
             cls: `chat-message-bubble ${type === 'user' ? 'user' : 'ai'} ${isError ? 'error' : ''}`
         });
+        
+        // 添加数据属性存储原始消息内容（用于全文复制）
+        if (text && !isLoading) {
+            msgBubble.setAttribute('data-message-content', text);
+        }
 
         if (isLoading) {
             msgBubble.addClass('loading');
@@ -558,6 +563,14 @@ export class ChatView extends ItemView {
             
             // 渲染回答内容
             await MarkdownRenderer.render(this.app, text, msgBubble, '', this);
+            
+            // 为代码块添加包裹容器和复制按钮
+            this.wrapCodeBlocks(msgBubble);
+            
+            // 为 AI 消息添加全文复制按钮（非错误消息）
+            if (type === 'ai' && !isError) {
+                this.addFullCopyButton(msgBubble, text);
+            }
         }
 
         container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
@@ -625,5 +638,191 @@ export class ChatView extends ItemView {
                 console.debug('思考面板已收起');
             }
         });
+    }
+    
+    // ============================================================
+    // 代码块包裹和复制按钮逻辑
+    // ============================================================
+    
+    // 语言映射表
+    private languageMap: { [key: string]: string } = {
+        'javascript': 'JavaScript',
+        'js': 'JavaScript',
+        'typescript': 'TypeScript',
+        'ts': 'TypeScript',
+        'python': 'Python',
+        'py': 'Python',
+        'java': 'Java',
+        'cpp': 'C++',
+        'c++': 'C++',
+        'csharp': 'C#',
+        'cs': 'C#',
+        'html': 'HTML',
+        'css': 'CSS',
+        'json': 'JSON',
+        'markdown': 'Markdown',
+        'md': 'Markdown',
+        'shell': 'Shell',
+        'bash': 'Shell',
+        'sql': 'SQL',
+    };
+    
+    // 为代码块添加包裹容器、Header Bar和复制按钮
+    private wrapCodeBlocks(container: HTMLElement) {
+        const codeBlocks = container.querySelectorAll('pre');
+        
+        codeBlocks.forEach((pre) => {
+            // 创建包裹容器
+            const wrapper = document.createElement('div');
+            wrapper.className = 'code-block-wrapper';
+            
+            // 创建Header Bar
+            const header = document.createElement('div');
+            header.className = 'code-block-header';
+            
+            // 提取语言标识
+            const codeEl = pre.querySelector('code');
+            let language = '';
+            if (codeEl) {
+                const classList = Array.from(codeEl.classList);
+                const langClass = classList.find(cls => cls.startsWith('language-'));
+                if (langClass) {
+                    const rawLang = langClass.replace('language-', '');
+                    language = this.languageMap[rawLang.toLowerCase()] || 
+                               rawLang.charAt(0).toUpperCase() + rawLang.slice(1);
+                }
+            }
+            
+            // 左侧：语言标签
+            const langLabel = document.createElement('span');
+            langLabel.className = 'code-language-label';
+            langLabel.textContent = language || 'CODE';
+            header.appendChild(langLabel);
+            
+            // 右侧：复制按钮
+            const copyBtn = this.createCodeCopyButton(pre);
+            header.appendChild(copyBtn);
+            
+            // 组装结构
+            pre.parentNode?.insertBefore(wrapper, pre);
+            wrapper.appendChild(header);
+            wrapper.appendChild(pre);
+        });
+    }
+    
+    // 创建代码块复制按钮
+    private createCodeCopyButton(pre: HTMLElement): HTMLElement {
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'code-copy-btn';
+        copyBtn.setAttribute('aria-label', '复制代码');
+        
+        // 图标容器
+        const iconContainer = document.createElement('span');
+        iconContainer.className = 'copy-btn-icon';
+        setIcon(iconContainer, 'copy');
+        copyBtn.appendChild(iconContainer);
+        
+        // 文字标签
+        const textLabel = document.createElement('span');
+        textLabel.className = 'copy-btn-text';
+        textLabel.textContent = '复制代码';
+        copyBtn.appendChild(textLabel);
+        
+        // 点击事件
+        copyBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            
+            // 提取代码内容
+            const codeEl = pre.querySelector('code');
+            const codeText = codeEl?.textContent || pre.textContent || '';
+            
+            if (!codeText.trim()) {
+                new Notice('无代码内容');
+                return;
+            }
+            
+            // 复制到剪贴板
+            const success = await this.copyToClipboard(codeText);
+            
+            if (success) {
+                // 成功反馈
+                copyBtn.classList.add('copy-btn--success');
+                iconContainer.innerHTML = '';
+                setIcon(iconContainer, 'check');
+                textLabel.textContent = '已复制';
+                
+                // 2秒后恢复
+                setTimeout(() => {
+                    copyBtn.classList.remove('copy-btn--success');
+                    iconContainer.innerHTML = '';
+                    setIcon(iconContainer, 'copy');
+                    textLabel.textContent = '复制代码';
+                }, 2000);
+            }
+        });
+        
+        return copyBtn;
+    }
+    
+    // 添加全文复制按钮
+    private addFullCopyButton(msgBubble: HTMLElement, text: string) {
+        const copyBtn = msgBubble.createEl('button', {
+            cls: 'message-copy-full-btn',
+            attr: { 'aria-label': '复制消息' }
+        });
+        
+        // 图标容器
+        const iconContainer = copyBtn.createEl('span', { cls: 'copy-btn-icon' });
+        setIcon(iconContainer, 'copy');
+        
+        // 文字标签
+        const textLabel = copyBtn.createEl('span', {
+            cls: 'copy-btn-text',
+            text: '复制'
+        });
+        
+        // 点击事件
+        copyBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            
+            // 获取要复制的内容（优先使用 data 属性）
+            const contentToCopy = msgBubble.getAttribute('data-message-content') || text;
+            
+            if (!contentToCopy.trim()) {
+                new Notice('无可复制内容');
+                return;
+            }
+            
+            // 复制到剪贴板
+            const success = await this.copyToClipboard(contentToCopy);
+            
+            if (success) {
+                // 成功反馈
+                copyBtn.addClass('copy-btn--success');
+                iconContainer.empty();
+                setIcon(iconContainer, 'check');
+                textLabel.setText('已复制');
+                
+                // 2秒后恢复
+                setTimeout(() => {
+                    copyBtn.removeClass('copy-btn--success');
+                    iconContainer.empty();
+                    setIcon(iconContainer, 'copy');
+                    textLabel.setText('复制');
+                }, 2000);
+            }
+        });
+    }
+    
+    // 复制内容到剪贴板
+    private async copyToClipboard(text: string): Promise<boolean> {
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch (err) {
+            console.error('复制失败:', err);
+            new Notice('复制失败，请重试');
+            return false;
+        }
     }
 }
