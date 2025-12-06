@@ -463,22 +463,9 @@ export class ChatView extends ItemView {
                         thinkingContent!.setText(processedThinking);
                     }
 
-                    // 滚动到思考面板（确保思考内容可见）
-                    if (thinkingPanel) {
-                        // 计算思考面板相对于消息历史容器的位置
-                        const panelRect = thinkingPanel.getBoundingClientRect();
-                        const containerRect = messageHistory.getBoundingClientRect();
-                        const relativeTop = panelRect.top - containerRect.top + messageHistory.scrollTop;
-                        
-                        // 滚动到思考面板位置，确保面板在视口内
-                        messageHistory.scrollTo({ 
-                            top: relativeTop - 20, // 留出一些顶部间距
-                            behavior: 'smooth' 
-                        });
-                    } else {
-                        // 如果没有思考面板，滚动到底部
-                        messageHistory.scrollTo({ top: messageHistory.scrollHeight, behavior: 'smooth' });
-                    }
+                    // 只滚动外部的消息历史容器到底部，不操作思考面板内部的滚动
+                    // 思考面板在活跃状态下会自然扩展，不会有内部滚动条
+                    messageHistory.scrollTo({ top: messageHistory.scrollHeight, behavior: 'smooth' });
 
                     thinkingRenderTimer = null;
                 }, 100); // ⚠️ 优化：思考内容渲染节流从 200ms 减少到 100ms，提升更新速度

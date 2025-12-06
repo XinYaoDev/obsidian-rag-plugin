@@ -782,6 +782,12 @@
     padding: 10px 12px;
 }
 
+/* 思考面板活跃状态（流式输出中）：移除滚动限制，让内容自然扩展 */
+.thinking-panel--active .thinking-panel__content--expanded {
+    max-height: none;
+    overflow-y: visible;
+}
+
 /* 思考面板活跃状态（流式输出中） */
 .thinking-panel--active {
     animation: pulse-border 2s ease-in-out infinite;
