@@ -307,14 +307,27 @@ export class ChatView extends ItemView {
         // ============================================================
         // 4. 发送逻辑 - 流式响应版本
         // ============================================================
+        // 当前请求的 AbortController（用于终止请求）
+        let currentAbortController: AbortController | null = null;
+        let currentUserMessageElement: HTMLElement | null = null;
+        let currentAIMessageWrapper: HTMLElement | null = null;
+        let currentUserInput: string = '';
+
         const sendMessage = async () => {
             const content = inputEl.value.trim();
             if (!content) return;
 
-            // 禁用发送按钮，防止重复请求
-            sendBtn.disabled = true;
-            sendBtn.style.opacity = '0.5';
-            sendBtn.style.cursor = 'not-allowed';
+            // 保存用户输入
+            currentUserInput = content;
+
+            // 将发送按钮改为终止按钮
+            sendBtn.disabled = false;
+            sendBtn.style.opacity = '1';
+            sendBtn.style.cursor = 'pointer';
+            sendBtn.setAttribute('aria-label', '终止');
+            sendBtn.addClass('stop-btn'); // 添加终止按钮样式类
+            sendBtn.empty();
+            setIcon(sendBtn, 'square'); // 方形终止按钮
 
             // 保存用户输入，用于失败撤回
             this.lastUserInput = content;
@@ -327,6 +340,7 @@ export class ChatView extends ItemView {
 
             // 显示并保存用户问题
             this.lastUserMessageElement = await this.appendMessage(messageHistory, content, 'user');
+            currentUserMessageElement = this.lastUserMessageElement;
             this.sessionManager.addMessage({ role: 'user', content: content });
             await this.sessionManager.saveSession(this.sessionManager.getCurrentSession()!);
 
@@ -334,6 +348,7 @@ export class ChatView extends ItemView {
             const msgWrapper = messageHistory.createEl('div', {
                 cls: 'chat-message-wrapper ai'
             });
+            currentAIMessageWrapper = msgWrapper;
             const msgBubble = msgWrapper.createEl('div', {
                 cls: 'chat-message-bubble ai'
             });
@@ -478,6 +493,63 @@ export class ChatView extends ItemView {
             const apiKey = this.plugin.settings.llmApiKey;
             const modelName = this.plugin.settings.llmModelName;
 
+            // 创建 AbortController 用于终止请求
+            currentAbortController = new AbortController();
+
+            // 终止按钮点击事件
+            const handleStop = async () => {
+                if (currentAbortController) {
+                    // 中止请求
+                    currentAbortController.abort();
+                    currentAbortController = null;
+                }
+
+                // 停止流式更新
+                isStreaming = false;
+                if (renderTimer) {
+                    clearTimeout(renderTimer);
+                    renderTimer = null;
+                }
+                if (thinkingRenderTimer) {
+                    clearTimeout(thinkingRenderTimer);
+                    thinkingRenderTimer = null;
+                }
+
+                // 删除用户消息和AI消息
+                if (currentUserMessageElement) {
+                    currentUserMessageElement.remove();
+                    currentUserMessageElement = null;
+                }
+                if (currentAIMessageWrapper) {
+                    currentAIMessageWrapper.remove();
+                    currentAIMessageWrapper = null;
+                }
+
+                // 从会话历史中移除最后两条消息（用户消息和AI消息）
+                this.sessionManager.removeLastMessage(); // 移除AI消息（如果已添加）
+                this.sessionManager.removeLastMessage(); // 移除用户消息
+                await this.sessionManager.saveSession(this.sessionManager.getCurrentSession()!);
+
+                // 恢复用户输入到输入框
+                inputEl.value = currentUserInput;
+                inputEl.focus();
+
+                // 恢复发送按钮
+                sendBtn.disabled = false;
+                sendBtn.style.opacity = '1';
+                sendBtn.style.cursor = 'pointer';
+                sendBtn.setAttribute('aria-label', '发送');
+                sendBtn.removeClass('stop-btn'); // 移除终止按钮样式类
+                sendBtn.empty();
+                setIcon(sendBtn, 'send');
+
+                // 移除终止按钮的点击事件（避免重复绑定）
+                sendBtn.onclick = sendMessage;
+            };
+
+            // 绑定终止按钮点击事件
+            sendBtn.onclick = handleStop;
+
             try {
                 // 移除初始 loading 图标
                 if (answerContainer) {
@@ -498,12 +570,15 @@ export class ChatView extends ItemView {
                         enableDeepThinking: this.plugin.settings.enableDeepThinking
                     },
                     apiKey,
+                    currentAbortController, // 传递 AbortController
                     // onThinking 回调
                     (thinkingData: string) => {
+                        if (!isStreaming) return; // 如果已终止，不再处理
                         updateThinking(thinkingData);
                     },
                     // onAnswer 回调
                     (answerData: string) => {
+                        if (!isStreaming) return; // 如果已终止，不再处理
                         // 第一次收到回答数据时，自动折叠思考面板
                         if (!hasStartedAnswering && thinkingPanel && thinkingContent && thinkingIconContainer) {
                             hasStartedAnswering = true;
@@ -524,6 +599,8 @@ export class ChatView extends ItemView {
                     // onError 回调
                     async (error: Error) => {
                         isStreaming = false;
+                        currentAbortController = null; // 清空 AbortController
+                        
                         if (renderTimer) {
                             clearTimeout(renderTimer);
                             renderTimer = null;
@@ -533,8 +610,14 @@ export class ChatView extends ItemView {
                             thinkingRenderTimer = null;
                         }
 
+                        // 如果是用户主动终止，不显示错误消息，终止逻辑已在 handleStop 中处理
+                        if (error.message === '请求已中止' || error.name === 'AbortError') {
+                            return;
+                        }
+
                         // 移除当前消息气泡
                         msgWrapper.remove();
+                        currentAIMessageWrapper = null;
 
                         // 显示错误消息
                         await this.appendMessage(messageHistory, `❌ ${error.message}`, 'ai', false, true);
@@ -546,10 +629,16 @@ export class ChatView extends ItemView {
                         sendBtn.disabled = false;
                         sendBtn.style.opacity = '1';
                         sendBtn.style.cursor = 'pointer';
+                        sendBtn.setAttribute('aria-label', '发送');
+                        sendBtn.removeClass('stop-btn'); // 移除终止按钮样式类
+                        sendBtn.empty();
+                        setIcon(sendBtn, 'send');
+                        sendBtn.onclick = sendMessage;
                     },
                     // onComplete 回调
                     async () => {
                         isStreaming = false;
+                        currentAbortController = null; // 清空 AbortController
 
                         // 清除所有节流定时器
                         if (renderTimer) {
@@ -607,18 +696,34 @@ export class ChatView extends ItemView {
                         // 成功后清空撤回状态
                         this.lastUserInput = null;
                         this.lastUserMessageElement = null;
+                        currentUserMessageElement = null;
+                        currentAIMessageWrapper = null;
 
                         // 恢复发送按钮
                         sendBtn.disabled = false;
                         sendBtn.style.opacity = '1';
                         sendBtn.style.cursor = 'pointer';
+                        sendBtn.setAttribute('aria-label', '发送');
+                        sendBtn.removeClass('stop-btn'); // 移除终止按钮样式类
+                        sendBtn.empty();
+                        setIcon(sendBtn, 'send');
+                        sendBtn.onclick = sendMessage;
                     }
                 );
 
             } catch (e: any) {
                 // 连接失败 - 执行撤回
                 isStreaming = false;
+                currentAbortController = null; // 清空 AbortController
+                
+                // 如果是用户主动终止，不显示错误消息
+                if (e.message === '请求已中止' || e.name === 'AbortError') {
+                    // 终止逻辑已在 handleStop 中处理，这里不需要额外操作
+                    return;
+                }
+
                 msgWrapper.remove();
+                currentAIMessageWrapper = null;
                 await this.appendMessage(messageHistory, `🔌 无法连接后端: ${e.message}`, 'ai', false, true);
                 await this.rollbackFailedMessage(inputEl);
 
@@ -626,6 +731,11 @@ export class ChatView extends ItemView {
                 sendBtn.disabled = false;
                 sendBtn.style.opacity = '1';
                 sendBtn.style.cursor = 'pointer';
+                sendBtn.setAttribute('aria-label', '发送');
+                sendBtn.removeClass('stop-btn'); // 移除终止按钮样式类
+                sendBtn.empty();
+                setIcon(sendBtn, 'send');
+                sendBtn.onclick = sendMessage;
             }
         };
 
@@ -980,16 +1090,15 @@ export class ChatView extends ItemView {
         url: string,
         requestBody: any,
         apiKey: string,
+        abortController: AbortController, // 接收外部传入的 AbortController
         onThinking: (data: string) => void,
         onAnswer: (data: string) => void,
         onError: (error: Error) => void,
         onComplete: () => void
     ): Promise<void> {
         let buffer = '';
-        let abortController: AbortController | null = null;
 
         try {
-            abortController = new AbortController();
 
             // 不设置超时限制，允许长时间流式响应
             const response = await fetch(url, {

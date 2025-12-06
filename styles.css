@@ -318,6 +318,23 @@
     height: 20px;
 }
 
+/* 终止按钮样式 */
+.chat-send-btn.stop-btn {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+/* 终止按钮悬停时变成红色警示 */
+.chat-send-btn.stop-btn:hover {
+    background-color: #dc3545 !important; /* 红色警示色 */
+    color: white;
+}
+
+.chat-send-btn.stop-btn:active {
+    background-color: #c82333 !important; /* 更深的红色 */
+    transform: scale(0.95);
+}
+
 /* ============================================================
    Markdown 渲染紧凑模式 (Compact Mode)
    强制覆盖 Obsidian 默认的大间距样式，避免气泡内空旷
