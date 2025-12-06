@@ -12,11 +12,6 @@ export class ChatView extends ItemView {
     // 失败撤回状态追踪
     private lastUserInput: string | null = null;
     private lastUserMessageElement: HTMLElement | null = null;
-    
-    // 输入历史管理（最近5条）
-    private inputHistory: string[] = [];
-    private inputHistoryIndex: number = -1; // 当前浏览的历史索引，-1 表示不在浏览历史
-    private currentInputBeforeHistory: string = ''; // 浏览历史前的输入内容
 
     constructor(leaf: WorkspaceLeaf, plugin: RagPlugin) {
         super(leaf);
@@ -59,12 +54,12 @@ export class ChatView extends ItemView {
         });
         setIcon(newBtn, 'plus');
 
-        // 回收站按钮（替换原来的删除当前会话按钮）
-        const trashBtn = sessionActions.createEl('button', {
-            cls: 'session-action-btn',
+        // 回收站按钮
+        const deleteBtn = sessionActions.createEl('button', {
+            cls: 'session-action-btn delete',
             attr: { 'aria-label': '回收站' }
         });
-        setIcon(trashBtn, 'archive'); // 使用 archive 图标，表示归档/存储
+        setIcon(deleteBtn, 'archive');
 
         // 清空当前会话按钮
         const clearBtn = sessionActions.createEl('button', {
@@ -128,7 +123,7 @@ export class ChatView extends ItemView {
                     cls: 'session-item-action delete',
                     attr: { 'aria-label': '删除' }
                 });
-                setIcon(delBtn, 'trash');
+                setIcon(delBtn, 'trash-2');
 
                 // 点击会话项切换会话
                 itemEl.addEventListener('click', async (e) => {
@@ -153,12 +148,9 @@ export class ChatView extends ItemView {
                 // 删除按钮事件
                 delBtn.addEventListener('click', async (e) => {
                     e.stopPropagation();
-                    await this.deleteSessionWithConfirm(session.sessionId, container, messageHistory, () => {
-                        // 刷新会话列表，保持下拉菜单打开
-                        if (dropdownEl) {
-                            refreshSessionList();
-                        }
-                    });
+                    await this.deleteSessionDirectly(session.sessionId, container, messageHistory);
+                    // 刷新会话列表，保持下拉菜单打开
+                    refreshSessionList();
                 });
             }
 
@@ -191,9 +183,10 @@ export class ChatView extends ItemView {
             await this.createNewSession(container, messageHistory);
         });
 
-        // 回收站按钮事件
-        trashBtn.addEventListener('click', async () => {
-            await this.showTrashDialog(container, messageHistory, refreshSessionList);
+        // 回收站按钮事件（显示回收站会话列表）
+        deleteBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await this.showTrashDropdown(deleteBtn, container, messageHistory);
         });
 
         // 清空当前会话按钮事件
@@ -268,24 +261,7 @@ export class ChatView extends ItemView {
                 return;
             }
 
-            // 2. 处理上下键浏览输入历史
-            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                // 如果输入框有内容且不在历史浏览模式，保存当前输入
-                if (this.inputHistoryIndex === -1 && inputEl.value.trim()) {
-                    this.currentInputBeforeHistory = inputEl.value;
-                }
-                
-                if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    this.navigateInputHistory(inputEl, 'up');
-                } else if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    this.navigateInputHistory(inputEl, 'down');
-                }
-                return;
-            }
-
-            // 3. 如果只按了 Enter (没有按 Shift)
+            // 2. 如果只按了 Enter (没有按 Shift)
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault(); // 阻止默认的换行行为
                 sendMessage();      // 执行发送
@@ -313,24 +289,13 @@ export class ChatView extends ItemView {
             const content = inputEl.value.trim();
             if (!content) return;
 
-            // 保存用户输入，用于失败撤回和终止恢复
-            this.lastUserInput = content;
-            
-            // 添加到输入历史（最多保留5条）
-            this.addToInputHistory(content);
+            // 禁用发送按钮，防止重复请求
+            sendBtn.disabled = true;
+            sendBtn.style.opacity = '0.5';
+            sendBtn.style.cursor = 'not-allowed';
 
-            // ⚠️ 切换按钮为终止按钮
-            sendBtn.empty();
-            setIcon(sendBtn, 'square'); // 使用正方形图标作为终止按钮
-            sendBtn.setAttribute('aria-label', '终止');
-            sendBtn.removeClass('chat-send-btn');
-            sendBtn.addClass('chat-stop-btn');
-            sendBtn.style.borderRadius = '8px'; // 正方形样式
-            sendBtn.style.backgroundColor = '#dc3545'; // 明确的红色背景
-            sendBtn.style.color = '#ffffff'; // 白色文字
-            sendBtn.disabled = false; // 终止按钮应该可点击
-            sendBtn.style.opacity = '1';
-            sendBtn.style.cursor = 'pointer';
+            // 保存用户输入，用于失败撤回
+            this.lastUserInput = content;
 
             inputEl.value = '';
             inputEl.style.height = 'auto';
@@ -362,12 +327,10 @@ export class ChatView extends ItemView {
             const RENDER_THROTTLE_MS = 150;
 
             // 创建思考面板（如果启用深度思考）
-            let isExpanded = true; // 用于跟踪折叠状态
-            let iconContainer: HTMLElement | null = null; // 用于自动折叠时更新图标
             if (this.plugin.settings.enableDeepThinking) {
                 thinkingPanel = msgBubble.createEl('div', { cls: 'thinking-panel' });
                 const header = thinkingPanel.createEl('div', { cls: 'thinking-panel__header' });
-                iconContainer = header.createEl('span', { cls: 'thinking-panel__icon' });
+                const iconContainer = header.createEl('span', { cls: 'thinking-panel__icon' });
                 setIcon(iconContainer, 'chevron-down'); // 默认展开状态
                 header.createEl('span', { cls: 'thinking-panel__title', text: '思考过程' });
                 thinkingContent = thinkingPanel.createEl('div', {
@@ -376,33 +339,23 @@ export class ChatView extends ItemView {
                 thinkingPanel.addClass('thinking-panel--active');
 
                 // 绑定折叠/展开功能
+                let isExpanded = true;
                 header.addEventListener('click', () => {
                     isExpanded = !isExpanded;
 
                     if (isExpanded) {
                         thinkingContent!.removeClass('thinking-panel__content--collapsed');
                         thinkingContent!.addClass('thinking-panel__content--expanded');
-                        iconContainer!.empty();
-                        setIcon(iconContainer!, 'chevron-down');
+                        iconContainer.empty();
+                        setIcon(iconContainer, 'chevron-down');
                     } else {
                         thinkingContent!.removeClass('thinking-panel__content--expanded');
                         thinkingContent!.addClass('thinking-panel__content--collapsed');
-                        iconContainer!.empty();
-                        setIcon(iconContainer!, 'chevron-right');
+                        iconContainer.empty();
+                        setIcon(iconContainer, 'chevron-right');
                     }
                 });
             }
-
-            // 创建折叠思考面板的函数（当开始回答时自动调用）
-            const collapseThinkingPanel = () => {
-                if (thinkingPanel && thinkingContent && iconContainer && isExpanded) {
-                    isExpanded = false;
-                    thinkingContent.removeClass('thinking-panel__content--expanded');
-                    thinkingContent.addClass('thinking-panel__content--collapsed');
-                    iconContainer.empty();
-                    setIcon(iconContainer, 'chevron-right');
-                }
-            };
 
             // 创建回答内容容器
             answerContainer = msgBubble.createEl('div', { cls: 'answer-content' });
@@ -459,20 +412,28 @@ export class ChatView extends ItemView {
                 if (!thinkingContent || !isStreaming) return;
                 thinkingBuffer += newData;
 
-                // 节流更新思考内容（纯文本显示，不渲染 Markdown）
+                // 节流渲染思考内容（减少节流时间以提升更新速度）
                 if (thinkingRenderTimer) {
                     clearTimeout(thinkingRenderTimer);
                 }
 
                 thinkingRenderTimer = setTimeout(() => {
-                    // 保留换行和空格，但不渲染 Markdown 语法
-                    this.renderPlainTextWithLineBreaks(thinkingContent!, thinkingBuffer);
+                    try {
+                        // 清空并重新渲染
+                        thinkingContent!.empty();
+                        MarkdownRenderer.render(this.app, thinkingBuffer, thinkingContent!, '', this).catch((e) => {
+                            console.error('思考内容渲染失败:', e);
+                            thinkingContent!.setText(thinkingBuffer);
+                        });
+                    } catch (e) {
+                        thinkingContent!.setText(thinkingBuffer);
+                    }
 
                     // 滚动到底部
                     messageHistory.scrollTo({ top: messageHistory.scrollHeight, behavior: 'smooth' });
 
                     thinkingRenderTimer = null;
-                }, 50); // ⚠️ 优化：纯文本更新，节流时间可以更短，提升更新速度
+                }, 100); // ⚠️ 优化：思考内容渲染节流从 200ms 减少到 100ms，提升更新速度
             };
 
             const backendUrl = this.plugin.settings.javaBackendUrl.replace(/\/$/, '');
@@ -491,80 +452,8 @@ export class ChatView extends ItemView {
                     }
                 }
 
-                // ⚠️ 使用对象引用，确保 handleStop 可以访问到更新后的 abortController
-                const abortControllerRef: { controller: AbortController | null } = { controller: null };
-
-                // ⚠️ 终止功能：中止请求并清理UI
-                const handleStop = async () => {
-                    console.log('终止按钮被点击', { 
-                        controller: abortControllerRef.controller, 
-                        isStreaming,
-                        aborted: abortControllerRef.controller?.signal.aborted 
-                    });
-                    
-                    // 先设置 isStreaming = false，防止继续处理数据
-                    if (!isStreaming) {
-                        console.log('流式请求已结束，无需终止');
-                        return;
-                    }
-                    
-                    isStreaming = false;
-                    
-                    // 如果有 controller，中止请求
-                    if (abortControllerRef.controller) {
-                        console.log('执行终止操作，中止请求');
-                        abortControllerRef.controller.abort();
-                    } else {
-                        console.log('AbortController 尚未创建，但已设置 isStreaming = false');
-                    }
-                    
-                    // 清除所有定时器
-                    if (renderTimer) {
-                        clearTimeout(renderTimer);
-                        renderTimer = null;
-                    }
-                    if (thinkingRenderTimer) {
-                        clearTimeout(thinkingRenderTimer);
-                        thinkingRenderTimer = null;
-                    }
-                    
-                    // 删除用户消息和AI消息
-                    if (this.lastUserMessageElement) {
-                        this.lastUserMessageElement.remove();
-                        this.lastUserMessageElement = null;
-                    }
-                    if (msgWrapper) {
-                        msgWrapper.remove();
-                    }
-                    
-                    // 恢复输入框内容
-                    if (this.lastUserInput) {
-                        inputEl.value = this.lastUserInput;
-                        inputEl.style.height = 'auto';
-                    }
-                    
-                    // 恢复发送按钮
-                    sendBtn.empty();
-                    setIcon(sendBtn, 'send');
-                    sendBtn.setAttribute('aria-label', '发送');
-                    sendBtn.removeClass('chat-stop-btn');
-                    sendBtn.addClass('chat-send-btn');
-                    sendBtn.style.borderRadius = '50%'; // 恢复圆形
-                    sendBtn.style.backgroundColor = ''; // 清除内联样式
-                    sendBtn.style.color = ''; // 清除文字颜色
-                    sendBtn.disabled = false;
-                    sendBtn.style.opacity = '1';
-                    sendBtn.style.cursor = 'pointer';
-                    
-                    // ⚠️ 重要：重新绑定发送按钮的点击事件
-                    sendBtn.onclick = sendMessage;
-                };
-
-                // 绑定终止按钮点击事件
-                sendBtn.onclick = handleStop;
-
                 // 发起流式请求
-                abortControllerRef.controller = await this.streamChat(
+                await this.streamChat(
                     chatUrl,
                     {
                         question: content,
@@ -580,11 +469,6 @@ export class ChatView extends ItemView {
                     },
                     // onAnswer 回调
                     (answerData: string) => {
-                        // ⚠️ 第一次收到回答数据时，自动折叠思考面板
-                        if (answerBuffer.length === 0 && answerData) {
-                            collapseThinkingPanel();
-                        }
-
                         answerBuffer += answerData;
                         // 添加流式样式类（用于显示打字机光标效果）
                         if (answerContainer && !answerContainer.hasClass('streaming')) {
@@ -604,46 +488,19 @@ export class ChatView extends ItemView {
                             thinkingRenderTimer = null;
                         }
 
-                        // 如果是用户主动终止，不显示错误消息
-                        if (error.message === '请求已中止') {
-                            // 终止逻辑已在 handleStop 中处理，这里只需要恢复按钮
-                            sendBtn.empty();
-                            setIcon(sendBtn, 'send');
-                            sendBtn.setAttribute('aria-label', '发送');
-                            sendBtn.removeClass('chat-stop-btn');
-                            sendBtn.addClass('chat-send-btn');
-                            sendBtn.style.borderRadius = '50%';
-                            sendBtn.style.backgroundColor = ''; // 清除内联样式
-                            sendBtn.style.color = ''; // 清除文字颜色
-                            sendBtn.disabled = false;
-                            sendBtn.style.opacity = '1';
-                            sendBtn.style.cursor = 'pointer';
-                            // ⚠️ 重要：重新绑定发送按钮的点击事件
-                            sendBtn.onclick = sendMessage;
-                            return;
-                        }
-
-                        // 其他错误：移除当前消息气泡并显示错误
+                        // 移除当前消息气泡
                         msgWrapper.remove();
+
+                        // 显示错误消息
                         await this.appendMessage(messageHistory, `❌ ${error.message}`, 'ai', false, true);
 
                         // 执行撤回
                         await this.rollbackFailedMessage(inputEl);
 
                         // 恢复发送按钮
-                        sendBtn.empty();
-                        setIcon(sendBtn, 'send');
-                        sendBtn.setAttribute('aria-label', '发送');
-                        sendBtn.removeClass('chat-stop-btn');
-                        sendBtn.addClass('chat-send-btn');
-                        sendBtn.style.borderRadius = '50%';
-                        sendBtn.style.backgroundColor = ''; // 清除内联样式
-                        sendBtn.style.color = ''; // 清除文字颜色
                         sendBtn.disabled = false;
                         sendBtn.style.opacity = '1';
                         sendBtn.style.cursor = 'pointer';
-                        // ⚠️ 重要：重新绑定发送按钮的点击事件
-                        sendBtn.onclick = sendMessage;
                     },
                     // onComplete 回调
                     async () => {
@@ -662,9 +519,14 @@ export class ChatView extends ItemView {
                         // 最终渲染回答内容
                         renderAnswer();
 
-                        // 最终渲染思考内容（如果有）- 保留换行和空格，但不渲染 Markdown
+                        // 最终渲染思考内容（如果有）
                         if (thinkingContent && thinkingBuffer) {
-                            this.renderPlainTextWithLineBreaks(thinkingContent, thinkingBuffer);
+                            try {
+                                thinkingContent.empty();
+                                await MarkdownRenderer.render(this.app, thinkingBuffer, thinkingContent, '', this);
+                            } catch (e) {
+                                thinkingContent.setText(thinkingBuffer);
+                            }
                         }
 
                         // 移除思考面板的活跃状态
@@ -693,19 +555,9 @@ export class ChatView extends ItemView {
                         this.lastUserMessageElement = null;
 
                         // 恢复发送按钮
-                        sendBtn.empty();
-                        setIcon(sendBtn, 'send');
-                        sendBtn.setAttribute('aria-label', '发送');
-                        sendBtn.removeClass('chat-stop-btn');
-                        sendBtn.addClass('chat-send-btn');
-                        sendBtn.style.borderRadius = '50%';
-                        sendBtn.style.backgroundColor = ''; // 清除内联样式
-                        sendBtn.style.color = ''; // 清除文字颜色
                         sendBtn.disabled = false;
                         sendBtn.style.opacity = '1';
                         sendBtn.style.cursor = 'pointer';
-                        // ⚠️ 重要：重新绑定发送按钮的点击事件
-                        sendBtn.onclick = sendMessage;
                     }
                 );
 
@@ -777,27 +629,11 @@ export class ChatView extends ItemView {
         }
     }
 
-    // 删除会话（移到回收站，无需确认）
-    private async deleteSessionWithConfirm(
-        sessionId: string, 
-        container: Element, 
-        messageHistory: HTMLElement,
-        onDeleted?: () => void
-    ) {
-        const session = this.sessionManager.getAllSessions().find(s => s.sessionId === sessionId);
-        if (!session) {
-            new Notice('会话不存在');
-            return;
-        }
-
+    // 删除会话（直接删除，不确认）
+    private async deleteSessionDirectly(sessionId: string, container: Element, messageHistory: HTMLElement) {
         try {
             const wasCurrentSession = sessionId === this.sessionManager.getCurrentSessionId();
-            const success = await this.sessionManager.deleteSession(sessionId);
-            
-            if (!success) {
-                new Notice('删除会话失败：操作未完成');
-                return;
-            }
+            await this.sessionManager.deleteSession(sessionId);
 
             // 如果删除的是当前会话，需要刷新界面
             if (wasCurrentSession) {
@@ -811,168 +647,22 @@ export class ChatView extends ItemView {
                 // 更新会话名称显示(如果需要可以添加)
                 messageHistory.scrollTo({ top: messageHistory.scrollHeight });
             }
-
-            // 调用回调函数刷新会话列表
-            if (onDeleted) {
-                onDeleted();
-            }
         } catch (e) {
             console.error('删除会话失败:', e);
-            const errorMessage = e instanceof Error ? e.message : '未知错误';
-            new Notice(`删除会话失败: ${errorMessage}`);
+            new Notice('删除会话失败');
         }
     }
 
-    // 显示回收站对话框
-    private async showTrashDialog(
-        container: Element, 
-        messageHistory: HTMLElement,
-        refreshSessionList: () => void
-    ) {
-        const trashItems = await this.sessionManager.getTrashItems();
-        
-        if (trashItems.length === 0) {
-            new Notice('回收站为空');
-            return;
-        }
+    // 删除会话（带确认）
+    private async deleteSessionWithConfirm(sessionId: string, container: Element, messageHistory: HTMLElement) {
+        const session = this.sessionManager.getAllSessions().find(s => s.sessionId === sessionId);
+        if (!session) return;
 
-        // 创建模态对话框
-        const modal = document.createElement('div');
-        modal.className = 'trash-modal';
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-        `;
+        // 确认对话框
+        const confirmed = confirm(`确定将会话「${session.sessionName}」移到回收站吗？`);
+        if (!confirmed) return;
 
-        const dialog = document.createElement('div');
-        dialog.className = 'trash-dialog';
-        dialog.style.cssText = `
-            background: var(--background-primary);
-            border-radius: 8px;
-            padding: 20px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 70vh;
-            overflow-y: auto;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        `;
-
-        const title = document.createElement('h3');
-        title.textContent = `回收站 (${trashItems.length} 个会话)`;
-        title.style.cssText = 'margin: 0 0 16px 0; font-size: 1.2em;';
-        dialog.appendChild(title);
-
-        const list = document.createElement('div');
-        list.style.cssText = 'display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;';
-
-        for (const item of trashItems) {
-            const itemEl = document.createElement('div');
-            itemEl.style.cssText = `
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 12px;
-                background: var(--background-secondary);
-                border-radius: 6px;
-            `;
-
-            const info = document.createElement('div');
-            info.style.cssText = 'flex: 1;';
-            const name = document.createElement('div');
-            name.textContent = item.sessionName;
-            name.style.cssText = 'font-weight: 500; margin-bottom: 4px;';
-            const time = document.createElement('div');
-            const deletedDate = new Date(item.deletedAt);
-            const daysAgo = Math.floor((Date.now() - item.deletedAt) / (1000 * 60 * 60 * 24));
-            time.textContent = `删除于 ${deletedDate.toLocaleDateString()} ${deletedDate.toLocaleTimeString()} (${daysAgo} 天前)`;
-            time.style.cssText = 'font-size: 0.85em; color: var(--text-muted);';
-            info.appendChild(name);
-            info.appendChild(time);
-
-            const actions = document.createElement('div');
-            actions.style.cssText = 'display: flex; gap: 8px;';
-
-            const restoreBtn = document.createElement('button');
-            restoreBtn.textContent = '恢复';
-            restoreBtn.style.cssText = `
-                padding: 6px 12px;
-                border: none;
-                border-radius: 4px;
-                background: var(--interactive-accent);
-                color: var(--text-on-accent);
-                cursor: pointer;
-                font-size: 0.9em;
-            `;
-            restoreBtn.addEventListener('click', async () => {
-                const success = await this.sessionManager.restoreFromTrash(item.sessionId);
-                if (success) {
-                    new Notice('会话已恢复');
-                    modal.remove();
-                    refreshSessionList();
-                } else {
-                    new Notice('恢复失败');
-                }
-            });
-
-            actions.appendChild(restoreBtn);
-            itemEl.appendChild(info);
-            itemEl.appendChild(actions);
-            list.appendChild(itemEl);
-        }
-
-        dialog.appendChild(list);
-
-        // 清空回收站按钮
-        const clearBtn = document.createElement('button');
-        clearBtn.textContent = '清空回收站';
-        clearBtn.style.cssText = `
-            width: 100%;
-            padding: 10px;
-            border: none;
-            border-radius: 4px;
-            background: var(--background-modifier-error);
-            color: var(--text-on-accent);
-            cursor: pointer;
-            font-weight: 500;
-        `;
-        clearBtn.addEventListener('click', async () => {
-            const confirmed = confirm(`确定要清空回收站吗？这将永久删除 ${trashItems.length} 个会话，此操作不可恢复。`);
-            if (confirmed) {
-                try {
-                    const success = await this.sessionManager.clearAllTrash();
-                    if (success) {
-                        new Notice('回收站已清空');
-                        modal.remove();
-                        refreshSessionList();
-                    } else {
-                        new Notice('清空回收站失败');
-                    }
-                } catch (e) {
-                    console.error('清空回收站失败:', e);
-                    new Notice('清空回收站失败');
-                }
-            }
-        });
-
-        dialog.appendChild(clearBtn);
-        modal.appendChild(dialog);
-
-        // 点击背景关闭
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.remove();
-            }
-        });
-
-        document.body.appendChild(modal);
+        await this.deleteSessionDirectly(sessionId, container, messageHistory);
     }
 
     // 重命名会话对话框
@@ -1000,6 +690,127 @@ export class ChatView extends ItemView {
         modal.open();
     }
 
+    // 显示回收站下拉菜单
+    private async showTrashDropdown(button: HTMLElement, container: Element, messageHistory: HTMLElement) {
+        // 如果已经打开，则关闭
+        const existingDropdown = container.querySelector('.trash-dropdown');
+        if (existingDropdown) {
+            existingDropdown.remove();
+            return;
+        }
+
+        // 创建下拉菜单
+        const header = container.querySelector('.chat-header') as HTMLElement;
+        if (!header) return;
+
+        const dropdownEl = header.createEl('div', { cls: 'trash-dropdown session-dropdown' });
+        
+        // 获取回收站会话
+        const trashSessions = await this.sessionManager.getTrashSessions();
+
+        if (trashSessions.length === 0) {
+            dropdownEl.createEl('div', { 
+                cls: 'trash-empty',
+                text: '回收站为空'
+            });
+        } else {
+            // 一键清空按钮
+            const clearAllBtn = dropdownEl.createEl('button', { cls: 'clear-all-trash-btn' });
+            setIcon(clearAllBtn, 'trash-2');
+            clearAllBtn.createEl('span', { text: '一键清空' });
+            clearAllBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const confirmed = confirm(`确定要清空回收站吗？将永久删除 ${trashSessions.length} 个会话，此操作不可撤销。`);
+                if (confirmed) {
+                    let successCount = 0;
+                    for (const session of trashSessions) {
+                        const success = await this.sessionManager.permanentlyDeleteFromTrash(session.sessionId);
+                        if (success) successCount++;
+                    }
+                    if (successCount > 0) {
+                        new Notice(`已清空 ${successCount} 个会话`);
+                        dropdownEl.remove();
+                        // 重新显示回收站列表（应该是空的）
+                        await this.showTrashDropdown(button, container, messageHistory);
+                    } else {
+                        new Notice('清空回收站失败');
+                    }
+                }
+            });
+
+            // 分隔线
+            dropdownEl.createEl('div', { cls: 'session-divider' });
+            // 显示回收站会话列表
+            for (const session of trashSessions) {
+                const itemEl = dropdownEl.createEl('div', { cls: 'session-item trash-item' });
+
+                // 会话信息
+                const infoEl = itemEl.createEl('div', { cls: 'session-info' });
+                infoEl.createEl('div', { cls: 'session-name', text: session.sessionName });
+                infoEl.createEl('div', {
+                    cls: 'session-meta',
+                    text: `${session.messageCount} 条消息 · ${new Date(session.updatedAt).toLocaleString('zh-CN')}`
+                });
+
+                // 操作按钮
+                const actionsEl = itemEl.createEl('div', { cls: 'session-item-actions' });
+
+                // 恢复按钮
+                const restoreBtn = actionsEl.createEl('button', {
+                    cls: 'session-item-action restore',
+                    attr: { 'aria-label': '恢复' }
+                });
+                setIcon(restoreBtn, 'rotate-ccw');
+                restoreBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const success = await this.sessionManager.restoreSessionFromTrash(session.sessionId);
+                    if (success) {
+                        new Notice('会话已恢复');
+                        dropdownEl.remove();
+                        // 刷新会话列表
+                        const sessionListBtn = container.querySelector('.session-action-btn[aria-label="会话列表"]') as HTMLElement;
+                        if (sessionListBtn) {
+                            sessionListBtn.click();
+                        }
+                    } else {
+                        new Notice('恢复会话失败');
+                    }
+                });
+
+                // 永久删除按钮
+                const deleteBtn = actionsEl.createEl('button', {
+                    cls: 'session-item-action delete',
+                    attr: { 'aria-label': '永久删除' }
+                });
+                setIcon(deleteBtn, 'trash-2');
+                deleteBtn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const confirmed = confirm(`确定永久删除会话「${session.sessionName}」吗？此操作不可撤销。`);
+                    if (confirmed) {
+                        const success = await this.sessionManager.permanentlyDeleteFromTrash(session.sessionId);
+                        if (success) {
+                            new Notice('会话已永久删除');
+                            dropdownEl.remove();
+                            // 重新显示回收站列表
+                            await this.showTrashDropdown(button, container, messageHistory);
+                        } else {
+                            new Notice('删除会话失败');
+                        }
+                    }
+                });
+            }
+        }
+
+        // 点击外部关闭下拉菜单
+        const closeDropdown = (e: MouseEvent) => {
+            if (dropdownEl && !dropdownEl.contains(e.target as Node) && e.target !== button) {
+                dropdownEl.remove();
+                document.removeEventListener('click', closeDropdown);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeDropdown), 0);
+    }
+
     // ============================================================
     // 流式请求核心函数
     // ============================================================
@@ -1007,7 +818,6 @@ export class ChatView extends ItemView {
     /**
      * 流式聊天请求函数
      * 使用 fetch + ReadableStream 处理 SSE 流
-     * @returns AbortController，用于中止请求
      */
     private async streamChat(
         url: string,
@@ -1017,7 +827,7 @@ export class ChatView extends ItemView {
         onAnswer: (data: string) => void,
         onError: (error: Error) => void,
         onComplete: () => void
-    ): Promise<AbortController> {
+    ): Promise<void> {
         let buffer = '';
         let abortController: AbortController | null = null;
         let timeoutId: NodeJS.Timeout | null = null;
@@ -1062,14 +872,6 @@ export class ChatView extends ItemView {
 
             try {
                 while (true) {
-                    // ⚠️ 检查是否已中止
-                    if (abortController.signal.aborted) {
-                        console.log('检测到请求已中止，停止读取');
-                        // 取消读取并关闭 reader
-                        reader.cancel();
-                        break;
-                    }
-
                     const { done, value } = await reader.read();
 
                     if (done) {
@@ -1077,13 +879,6 @@ export class ChatView extends ItemView {
                         if (buffer.trim()) {
                             this.processSSEBuffer(buffer, onThinking, onAnswer);
                         }
-                        break;
-                    }
-
-                    // ⚠️ 再次检查是否已中止（在读取数据后）
-                    if (abortController.signal.aborted) {
-                        console.log('读取数据后检测到请求已中止，停止处理');
-                        reader.cancel();
                         break;
                     }
 
@@ -1097,12 +892,10 @@ export class ChatView extends ItemView {
                     // 保留最后一个可能不完整的部分
                     buffer = parts.pop() || '';
 
-                    // 处理完整的事件块（只有在未中止时才处理）
-                    if (!abortController.signal.aborted) {
-                        for (const part of parts) {
-                            if (part.trim()) {
-                                this.processSSEBuffer(part, onThinking, onAnswer);
-                            }
+                    // 处理完整的事件块
+                    for (const part of parts) {
+                        if (part.trim()) {
+                            this.processSSEBuffer(part, onThinking, onAnswer);
                         }
                     }
                 }
@@ -1113,31 +906,15 @@ export class ChatView extends ItemView {
                     timeoutId = null;
                 }
 
-                // ⚠️ 只有在未中止时才调用 onComplete
-                if (!abortController.signal.aborted) {
-                    onComplete();
-                } else {
-                    console.log('请求已中止，不调用 onComplete');
-                }
-
-                // 返回 abortController
-                return abortController!;
+                onComplete();
 
             } catch (readError: any) {
-                if (readError.name === 'AbortError' || abortController.signal.aborted) {
-                    console.log('读取过程中检测到中止，不抛出错误');
-                    // 不抛出错误，直接返回
-                    return abortController!;
+                if (readError.name === 'AbortError') {
+                    throw new Error('请求已中止');
                 }
                 throw readError;
             } finally {
-                // 确保释放 reader
-                try {
-                    reader.releaseLock();
-                } catch (e) {
-                    // 忽略释放锁时的错误
-                    console.log('释放 reader 锁时出错（可能已释放）', e);
-                }
+                reader.releaseLock();
             }
 
         } catch (error: any) {
@@ -1153,9 +930,6 @@ export class ChatView extends ItemView {
             } else {
                 onError(new Error(`网络错误: ${error.message || '未知错误'}`));
             }
-
-            // 即使出错也要返回 abortController
-            return abortController || new AbortController();
         }
     }
 
@@ -1333,8 +1107,14 @@ export class ChatView extends ItemView {
             cls: 'thinking-panel__content thinking-panel__content--collapsed'
         });
 
-        // 渲染思考内容 - 保留换行和空格，但不渲染 Markdown
-        this.renderPlainTextWithLineBreaks(content, thinking);
+        // 渲染思考内容的 Markdown
+        try {
+            await MarkdownRenderer.render(this.app, thinking, content, '', this);
+        } catch (e) {
+            console.error('思考内容 Markdown 渲染失败:', e);
+            // 降级为纯文本显示
+            content.setText(thinking);
+        }
 
         // 绑定点击事件，切换展开/收起状态
         let isExpanded = false;
@@ -1357,47 +1137,6 @@ export class ChatView extends ItemView {
                 console.debug('思考面板已收起');
             }
         });
-    }
-
-    /**
-     * 渲染纯文本内容，保留换行和空格，但不渲染 Markdown 语法
-     * 用于深度思考面板的显示
-     */
-    private renderPlainTextWithLineBreaks(container: HTMLElement, text: string): void {
-        // 转义 HTML 特殊字符，防止 XSS
-        const escapeHtml = (str: string): string => {
-            const div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
-        };
-
-        // 移除 Markdown 语法标记（但保留换行和空格）
-        let processed = text
-            // 移除代码块标记
-            .replace(/```[\s\S]*?```/g, '')
-            .replace(/`[^`]+`/g, '')
-            // 移除加粗标记
-            .replace(/\*\*([^*]+)\*\*/g, '$1')
-            .replace(/\*([^*]+)\*/g, '$1')
-            // 移除斜体标记
-            .replace(/_([^_]+)_/g, '$1')
-            // 移除链接标记
-            .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
-            // 移除标题标记
-            .replace(/^#{1,6}\s+/gm, '')
-            // 移除列表标记
-            .replace(/^[\s]*[-*+]\s+/gm, '')
-            .replace(/^[\s]*\d+\.\s+/gm, '');
-
-        // 转义 HTML 并保留换行
-        const escaped = escapeHtml(processed);
-        
-        // 设置样式以保留换行和空格
-        container.style.whiteSpace = 'pre-wrap';
-        container.style.wordBreak = 'break-word';
-        
-        // 使用 innerHTML 保留换行（已转义，安全）
-        container.innerHTML = escaped;
     }
 
     // ============================================================
@@ -1429,16 +1168,9 @@ export class ChatView extends ItemView {
 
     // 为代码块添加包裹容器、Header Bar和复制按钮
     private wrapCodeBlocks(container: HTMLElement) {
-        const codeBlocks = container.querySelectorAll('pre:not(.code-block-wrapper pre)');
+        const codeBlocks = container.querySelectorAll('pre');
 
-        codeBlocks.forEach((preEl) => {
-            const pre = preEl as HTMLElement;
-            
-            // 检查是否已经被包装过（避免重复包装）
-            if (pre.parentElement?.classList.contains('code-block-wrapper')) {
-                return;
-            }
-
+        codeBlocks.forEach((pre) => {
             // 创建包裹容器
             const wrapper = document.createElement('div');
             wrapper.className = 'code-block-wrapper';
@@ -1457,27 +1189,7 @@ export class ChatView extends ItemView {
                     const rawLang = langClass.replace('language-', '');
                     language = this.languageMap[rawLang.toLowerCase()] ||
                         rawLang.charAt(0).toUpperCase() + rawLang.slice(1);
-                    console.debug('提取到语言标识:', rawLang, '->', language);
-                    
-                    // 清理代码块第一行可能存在的语言标识文本
-                    // 如果第一行只包含语言标识（可能是预处理导致的），移除它
-                    const codeText = codeEl.textContent || '';
-                    const firstLine = codeText.split('\n')[0].trim();
-                    if (firstLine === rawLang || firstLine.toLowerCase() === rawLang.toLowerCase()) {
-                        // 移除第一行
-                        const lines = codeText.split('\n');
-                        if (lines.length > 1) {
-                            codeEl.textContent = lines.slice(1).join('\n');
-                        } else {
-                            codeEl.textContent = '';
-                        }
-                        console.debug('已清理代码块第一行的语言标识文本');
-                    }
-                } else {
-                    console.debug('未找到语言类名，codeEl.classList:', classList);
                 }
-            } else {
-                console.debug('未找到 code 元素');
             }
 
             // 左侧：语言标签
@@ -1491,9 +1203,7 @@ export class ChatView extends ItemView {
             header.appendChild(copyBtn);
 
             // 组装结构
-            if (pre.parentElement) {
-                pre.parentElement.insertBefore(wrapper, pre);
-            }
+            pre.parentNode?.insertBefore(wrapper, pre);
             wrapper.appendChild(header);
             wrapper.appendChild(pre);
         });
@@ -1514,7 +1224,7 @@ export class ChatView extends ItemView {
         // 文字标签
         const textLabel = document.createElement('span');
         textLabel.className = 'copy-btn-text';
-        textLabel.textContent = '复制代码';
+        textLabel.textContent = '';
         copyBtn.appendChild(textLabel);
 
         // 点击事件
@@ -1545,7 +1255,7 @@ export class ChatView extends ItemView {
                     copyBtn.classList.remove('copy-btn--success');
                     iconContainer.innerHTML = '';
                     setIcon(iconContainer, 'copy');
-                    textLabel.textContent = '复制代码';
+                    textLabel.textContent = '';
                 }, 2000);
             }
         });
@@ -1567,7 +1277,7 @@ export class ChatView extends ItemView {
         // 文字标签
         const textLabel = copyBtn.createEl('span', {
             cls: 'copy-btn-text',
-            text: '复制'
+            text: ''
         });
 
         // 点击事件
@@ -1597,7 +1307,7 @@ export class ChatView extends ItemView {
                     copyBtn.removeClass('copy-btn--success');
                     iconContainer.empty();
                     setIcon(iconContainer, 'copy');
-                    textLabel.setText('复制');
+                    textLabel.setText('');
                 }, 2000);
             }
         });
@@ -1620,7 +1330,6 @@ export class ChatView extends ItemView {
      * 主要处理未闭合的代码块，避免 Markdown 解析失败
      * 
      * 注意：这个方法只修改用于渲染的字符串副本，不会修改原始的 answerBuffer
-     * 尽量少修改，避免破坏已正确格式化的代码块
      */
     private preprocessIncompleteMarkdown(markdown: string): string {
         if (!markdown) return markdown;
@@ -1650,74 +1359,16 @@ export class ChatView extends ItemView {
             }
         }
 
-        // 2. 只在必要时修复代码块标记格式
-        // 避免过度修改已正确格式化的代码块
-        // 只在代码块标记紧邻非换行字符时才添加换行（避免破坏格式）
-        // 注意：这个正则只匹配紧邻非换行字符的情况，不会影响已经正确格式化的代码块
-        processed = processed.replace(/([^\n\r])```([a-zA-Z0-9+\-._]*\n)/g, '$1\n```$2');
-        processed = processed.replace(/([^\n\r])```([a-zA-Z0-9+\-._]*$)/gm, '$1\n```$2');
+        // 2. 修复代码块标记格式：确保代码块标记前后有适当的换行
+        // 这有助于 Markdown 解析器正确识别代码块
+        // 代码块开始标记：确保前面有换行（除非在行首）
+        processed = processed.replace(/([^\n\r\s])```([a-zA-Z0-9]*)/g, '$1\n```$2');
+        // 代码块结束标记：确保后面有换行（除非在行尾）
+        processed = processed.replace(/```([^\n\r\s])/g, '```\n$1');
+
+        // 3. 清理多余的空行（避免影响渲染，但保留必要的空行）
+        processed = processed.replace(/\n{4,}/g, '\n\n\n');
 
         return processed;
-    }
-
-    /**
-     * 添加到输入历史（最多保留5条）
-     */
-    private addToInputHistory(content: string): void {
-        // 如果与最后一条历史相同，不重复添加
-        if (this.inputHistory.length > 0 && this.inputHistory[0] === content) {
-            return;
-        }
-        
-        // 添加到数组开头
-        this.inputHistory.unshift(content);
-        
-        // 只保留最近5条
-        if (this.inputHistory.length > 5) {
-            this.inputHistory = this.inputHistory.slice(0, 5);
-        }
-        
-        // 重置历史索引
-        this.inputHistoryIndex = -1;
-        this.currentInputBeforeHistory = '';
-    }
-
-    /**
-     * 浏览输入历史
-     */
-    private navigateInputHistory(inputEl: HTMLTextAreaElement, direction: 'up' | 'down'): void {
-        if (this.inputHistory.length === 0) {
-            return;
-        }
-
-        if (direction === 'up') {
-            // 向上浏览（更早的历史）
-            if (this.inputHistoryIndex < this.inputHistory.length - 1) {
-                this.inputHistoryIndex++;
-                inputEl.value = this.inputHistory[this.inputHistoryIndex];
-                // 将光标移到末尾
-                setTimeout(() => {
-                    inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
-                }, 0);
-            }
-        } else {
-            // 向下浏览（更新的历史）
-            if (this.inputHistoryIndex > 0) {
-                this.inputHistoryIndex--;
-                inputEl.value = this.inputHistory[this.inputHistoryIndex];
-                // 将光标移到末尾
-                setTimeout(() => {
-                    inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
-                }, 0);
-            } else if (this.inputHistoryIndex === 0) {
-                // 回到浏览历史前的输入内容
-                this.inputHistoryIndex = -1;
-                inputEl.value = this.currentInputBeforeHistory;
-                // 将光标移到末尾
-                setTimeout(() => {
-                    inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
-                }, 0);
-            }
-        }
     }
 }

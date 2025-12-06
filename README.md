@@ -35,13 +35,9 @@ It is not just a simple AI chat interface. By connecting to a local **Java Backe
     -   Integrated with **DeepSeek R1** / **Qwen QwQ** reasoning models.
     -   Provides an **independent toggle** to enable "Deep Thinking" with one click.
     -   Displays the AI's **Chain of Thought (CoT)**, showing not just the result, but the logical deduction process.
-    -   **Formatted Display:** Preserves line breaks and spaces for readability while removing Markdown syntax (code blocks, bold, etc.) for a clean text view.
-    -   **Auto-Collapse:** The thinking panel automatically collapses when the answer starts streaming.
 
 ### 🎨 Interactive Experience (UI/UX) NEW!
 
--   **🌊 Streaming Response:** Real-time streaming output with typewriter effect, reducing perceived latency. AI responses appear word by word as they are generated.
--   **🛑 Stop Generation:** The send button automatically transforms into a red square stop button after sending. Click it anytime during generation to interrupt the response, restore your question to the input box for editing, and clean up the conversation.
 -   **📋 Seamless Copying:**
     -   **Full-Text Copy:** Added a "Copy Full Text" button (icon + label) at the bottom left of AI message bubbles for one-click extraction.
     -   **Code Optimization:** Code blocks now feature a sleek Header Bar displaying the language tag and a dedicated copy button.
@@ -52,10 +48,6 @@ It is not just a simple AI chat interface. By connecting to a local **Java Backe
 
 -   **Conversation Persistence:** Chat history is automatically saved in `Assets/History/chat_history.json` within your Vault. Your data stays in your hands.
 -   **Context Memory:** Automatically loads the last conversation context upon restarting Obsidian, supporting multi-turn dialogue.
--   **🗂️ Session Management System:**
-    -   **Multiple Sessions:** Create, switch, rename, and manage multiple conversation sessions.
-    -   **Recycle Bin:** Deleted sessions are moved to a recycle bin with a 7-day retention period, allowing recovery of accidentally deleted conversations.
-    -   **Empty Recycle Bin:** One-click option to permanently delete all sessions in the recycle bin.
 -   **One-Click Reset:** A trash can icon allows you to clear history instantly and start a new topic.
 
 ### ⚙️ Flexibility & Intelligence
@@ -126,13 +118,9 @@ After enabling the plugin, go to **Settings -> RAG Assistant**:
 
 1.  **Open Assistant:** Click the **🤖 Robot Icon** in the left ribbon.
 2.  **Enable Deep Thinking:** (Optional) Toggle the **🧠 Deep Thinking** switch above the input box.
-3.  **Ask Questions:** Type your question and press **Enter** or **Ctrl+Enter** to send.
-4.  **Stop Generation:** After sending, the send button becomes a red square stop button. Click it anytime to interrupt the response and restore your question to the input box.
-5.  **Copy Content:** Click the icon in the code block header to copy code, or use the button at the bottom of the bubble to copy the full response.
-6.  **Manage Sessions:** 
-    -   Click the **📋 List** icon in the top toolbar to view, switch, rename, or delete sessions.
-    -   Click the **📦 Archive** icon to access the recycle bin and restore deleted sessions.
-    -   Use the **🗑️ Trash Can** icon to clear the current conversation context.
+3.  **Ask Questions:** Type your question and press **Enter** to send.
+4.  **Copy Content:** Click the icon in the code block header to copy code, or use the button at the bottom of the bubble to copy the full response.
+5.  **Manage History:** Click the **🗑️ Trash Can** icon in the top toolbar to clear the current context.
 
 ---
 
@@ -144,12 +132,9 @@ We are continuously improving the experience. Here is what's coming next:
 -   [x] **Deep Thinking (CoT) Display & Toggle**
 -   [x] **Conversation History Persistence**
 -   [x] **📋 One-Click Copy:** Support copying code blocks or full AI responses with one click.
--   [x] **🛑 Stop Generation:** Red square stop button to interrupt AI output at any time, with automatic question restoration.
--   [x] **🌊 Streaming Response:** Real-time streaming output with typewriter effect, reducing perceived latency.
--   [x] **🗂️ Session Management:** Multiple session support with create, switch, rename, and delete capabilities.
--   [x] **📦 Recycle Bin:** Soft-delete sessions with 7-day retention and recovery option.
--   [x] **🧠 Enhanced Deep Thinking:** Formatted display with preserved line breaks and auto-collapse feature.
+-   [ ] **🛑 Stop Generation:** Button to interrupt AI output at any time.
 -   [ ] **📝 Auto-Summary:** Automatically generate conversation titles based on chat content and display a history list in the sidebar.
+-   [ ] **🌊 Streaming Response:** Optimize typewriter effect to reduce perceived latency.
 -   [ ] **🔗 Source Citation:** Clickable citation badges in answers that jump to the corresponding note paragraph.
 
 ---
