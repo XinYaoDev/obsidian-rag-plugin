@@ -59,6 +59,9 @@ export class SessionManager {
             // 确保回收站目录存在
             await this.ensureTrashDirExists();
             
+            // 清理超过7天的回收站记录
+            await this.cleanExpiredTrash();
+            
             // 检查是否需要迁移旧数据
             const needMigration = await this.checkNeedMigration();
             if (needMigration) {
@@ -615,6 +618,64 @@ export class SessionManager {
         } catch (e) {
             console.error('永久删除会话失败:', e);
             return false;
+        }
+    }
+
+    // ==================== 回收站清理 ====================
+    
+    // 清理超过7天的回收站记录
+    private async cleanExpiredTrash(): Promise<void> {
+        try {
+            await this.ensureTrashDirExists();
+            const trashFolder = this.app.vault.getAbstractFileByPath(this.trashDir);
+            if (!trashFolder) {
+                return;
+            }
+
+            // 获取回收站中的所有文件
+            const trashFiles = this.app.vault.getFiles().filter(file => 
+                file.path.startsWith(this.trashDir + '/') && file.extension === 'json'
+            );
+
+            if (trashFiles.length === 0) {
+                return;
+            }
+
+            // 计算7天前的时间戳
+            const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+            let deletedCount = 0;
+
+            for (const file of trashFiles) {
+                try {
+                    // 读取会话文件内容，获取 updatedAt 字段
+                    const content = await this.app.vault.read(file);
+                    const session: Session = JSON.parse(content);
+                    
+                    // 使用会话的 updatedAt 时间戳判断（这是会话最后更新的时间，即删除前的时间）
+                    // 如果会话最后更新时间早于7天前，删除它
+                    if (session.updatedAt < sevenDaysAgo) {
+                        await this.app.vault.delete(file);
+                        deletedCount++;
+                    }
+                } catch (e) {
+                    // 如果文件损坏或格式错误，也尝试删除（使用文件修改时间作为备选）
+                    try {
+                        const fileMtime = file.stat.mtime;
+                        if (fileMtime < sevenDaysAgo) {
+                            await this.app.vault.delete(file);
+                            deletedCount++;
+                        }
+                    } catch (deleteError) {
+                        console.error(`删除过期回收站文件失败: ${file.path}`, deleteError);
+                    }
+                }
+            }
+
+            if (deletedCount > 0) {
+                console.log(`已清理 ${deletedCount} 个超过7天的回收站记录`);
+            }
+        } catch (e) {
+            console.error('清理过期回收站记录失败:', e);
         }
     }
 }

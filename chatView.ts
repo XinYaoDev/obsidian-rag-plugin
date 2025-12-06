@@ -13,6 +13,11 @@ export class ChatView extends ItemView {
     private lastUserInput: string | null = null;
     private lastUserMessageElement: HTMLElement | null = null;
 
+    // 输入历史记录
+    private inputHistory: string[] = [];
+    private inputHistoryIndex: number = -1; // -1 表示在最新位置
+    private readonly MAX_HISTORY_SIZE = 50; // 最多保存50条历史记录
+
     constructor(leaf: WorkspaceLeaf, plugin: RagPlugin) {
         super(leaf);
         this.plugin = plugin;
@@ -26,6 +31,9 @@ export class ChatView extends ItemView {
     async onOpen() {
         // 初始化 SessionManager
         await this.sessionManager.initialize();
+
+        // 加载输入历史记录
+        await this.loadInputHistory();
 
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
@@ -261,7 +269,19 @@ export class ChatView extends ItemView {
                 return;
             }
 
-            // 2. 如果只按了 Enter (没有按 Shift)
+            // 2. 处理上键/下键浏览历史记录
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                this.navigateHistory(inputEl, -1);
+                return;
+            }
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                this.navigateHistory(inputEl, 1);
+                return;
+            }
+
+            // 3. 如果只按了 Enter (没有按 Shift)
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault(); // 阻止默认的换行行为
                 sendMessage();      // 执行发送
@@ -296,6 +316,9 @@ export class ChatView extends ItemView {
 
             // 保存用户输入，用于失败撤回
             this.lastUserInput = content;
+
+            // 保存到输入历史记录
+            this.addToInputHistory(content);
 
             inputEl.value = '';
             inputEl.style.height = 'auto';
@@ -809,6 +832,105 @@ export class ChatView extends ItemView {
             }
         };
         setTimeout(() => document.addEventListener('click', closeDropdown), 0);
+    }
+
+    // ============================================================
+    // 输入历史记录管理
+    // ============================================================
+
+    // 加载输入历史记录
+    private async loadInputHistory(): Promise<void> {
+        try {
+            const data = await this.plugin.loadData();
+            if (data && data.inputHistory && Array.isArray(data.inputHistory)) {
+                this.inputHistory = data.inputHistory;
+                // 限制历史记录数量
+                if (this.inputHistory.length > this.MAX_HISTORY_SIZE) {
+                    this.inputHistory = this.inputHistory.slice(-this.MAX_HISTORY_SIZE);
+                }
+            }
+        } catch (e) {
+            console.error('加载输入历史记录失败:', e);
+            this.inputHistory = [];
+        }
+    }
+
+    // 保存输入历史记录
+    private async saveInputHistory(): Promise<void> {
+        try {
+            const data = await this.plugin.loadData() || {};
+            data.inputHistory = this.inputHistory;
+            await this.plugin.saveData(data);
+        } catch (e) {
+            console.error('保存输入历史记录失败:', e);
+        }
+    }
+
+    // 添加到输入历史记录
+    private addToInputHistory(content: string): void {
+        // 如果与最后一条相同，不重复添加
+        if (this.inputHistory.length > 0 && this.inputHistory[this.inputHistory.length - 1] === content) {
+            return;
+        }
+
+        // 添加到末尾
+        this.inputHistory.push(content);
+
+        // 限制历史记录数量
+        if (this.inputHistory.length > this.MAX_HISTORY_SIZE) {
+            this.inputHistory = this.inputHistory.slice(-this.MAX_HISTORY_SIZE);
+        }
+
+        // 重置索引
+        this.inputHistoryIndex = -1;
+
+        // 异步保存（不阻塞发送）
+        this.saveInputHistory();
+    }
+
+    // 浏览历史记录
+    private navigateHistory(inputEl: HTMLTextAreaElement, direction: number): void {
+        if (this.inputHistory.length === 0) {
+            return;
+        }
+
+        // 如果当前在最新位置（-1），且用户正在输入内容，先保存当前输入
+        if (this.inputHistoryIndex === -1 && inputEl.value.trim()) {
+            // 不保存，只是浏览历史
+        }
+
+        // 计算新索引
+        if (direction === -1) {
+            // 向上：查看更早的历史
+            if (this.inputHistoryIndex === -1) {
+                // 从最新开始
+                this.inputHistoryIndex = this.inputHistory.length - 1;
+            } else if (this.inputHistoryIndex > 0) {
+                this.inputHistoryIndex--;
+            }
+        } else {
+            // 向下：查看更新的历史
+            if (this.inputHistoryIndex === -1) {
+                // 已经在最新位置
+                return;
+            } else if (this.inputHistoryIndex < this.inputHistory.length - 1) {
+                this.inputHistoryIndex++;
+            } else {
+                // 到达最新位置，清空输入框
+                this.inputHistoryIndex = -1;
+                inputEl.value = '';
+                return;
+            }
+        }
+
+        // 设置输入框内容
+        if (this.inputHistoryIndex >= 0 && this.inputHistoryIndex < this.inputHistory.length) {
+            inputEl.value = this.inputHistory[this.inputHistoryIndex];
+            // 将光标移到末尾
+            setTimeout(() => {
+                inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
+            }, 0);
+        }
     }
 
     // ============================================================
