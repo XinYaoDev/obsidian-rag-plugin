@@ -115,5 +115,49 @@ export class RagSettingTab extends PluginSettingTab {
                     this.plugin.settings.enableSync = value;
                     await this.plugin.saveSettings();
                 }));
+
+        // ================= 高级设置 =================
+        containerEl.createEl('h3', { text: '🔧 高级设置' });
+
+        // 自动生成会话标题设置
+        containerEl.createEl('h4', { text: '自动生成会话标题' });
+        containerEl.createEl('p', { 
+            text: '配置用于自动生成会话标题的模型。如果不配置，将使用对话模型（LLM）的设置。',
+            cls: 'setting-item-description'
+        });
+
+        new Setting(containerEl)
+            .setName('标题生成服务商')
+            .setDesc('选择用于生成会话标题的模型服务商')
+            .addDropdown(dropdown => {
+                LLM_PROVIDERS.forEach(p => dropdown.addOption(p.value, p.text));
+                dropdown.setValue(this.plugin.settings.titleGenerationProvider || this.plugin.settings.selectedLlmProvider)
+                    .onChange(async (value) => {
+                        this.plugin.settings.titleGenerationProvider = value;
+                        await this.plugin.saveSettings();
+                    });
+            });
+
+        new Setting(containerEl)
+            .setName('标题生成模型名称')
+            .setDesc('填入具体模型 ID (如 deepseek-chat, qwen-turbo, gpt-4)')
+            .addText(text => text
+                .setPlaceholder('deepseek-chat')
+                .setValue(this.plugin.settings.titleGenerationModelName || this.plugin.settings.llmModelName)
+                .onChange(async (value) => {
+                    this.plugin.settings.titleGenerationModelName = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('标题生成 API Key')
+            .setDesc('标题生成模型的 API Key（留空则使用 LLM API Key）')
+            .addText(text => text
+                .setPlaceholder('sk-...')
+                .setValue(this.plugin.settings.titleGenerationApiKey)
+                .onChange(async (value) => {
+                    this.plugin.settings.titleGenerationApiKey = value;
+                    await this.plugin.saveSettings();
+                }));
     }
 }

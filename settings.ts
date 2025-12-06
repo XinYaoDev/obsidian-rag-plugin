@@ -34,6 +34,11 @@ export interface RagSettings {
 
 	// --- 深度思考设置 ---
 	enableDeepThinking: boolean; // 是否启用深度思考模式
+
+	// --- 高级设置：自动生成会话标题 ---
+	titleGenerationProvider: string; // 标题生成服务商
+	titleGenerationModelName: string; // 标题生成模型名称
+	titleGenerationApiKey: string; // 标题生成 API Key
 }
 
 export const DEFAULT_SETTINGS: RagSettings = {
@@ -51,4 +56,9 @@ export const DEFAULT_SETTINGS: RagSettings = {
 	debounceDelay: 2000,
 
 	enableDeepThinking: false, // 默认关闭深度思考
+
+	// 默认使用与 LLM 相同的配置
+	titleGenerationProvider: "deepseek",
+	titleGenerationModelName: "deepseek-chat",
+	titleGenerationApiKey: "",
 };

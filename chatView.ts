@@ -691,6 +691,9 @@ export class ChatView extends ItemView {
                                 thinking: thinkingBuffer || null // 保存思考过程
                             });
                             await this.sessionManager.saveSession(this.sessionManager.getCurrentSession()!);
+                            
+                            // ✅ 自动生成会话主题名称（仅在第一次提问且为默认名称时）
+                            await this.autoGenerateSessionTitle(content, answerBuffer);
                         }
 
                         // 成功后清空撤回状态
@@ -1732,5 +1735,178 @@ export class ChatView extends ItemView {
         processed = processed.replace(/\n{4,}/g, '\n\n\n');
 
         return processed;
+    }
+
+    // ============================================================
+    // 自动生成会话主题名称
+    // ============================================================
+    
+    /**
+     * 自动生成会话主题名称
+     * 仅在第一次提问且会话名称为默认格式时触发
+     * @param userQuestion 用户第一次提问的内容
+     * @param aiAnswer AI回答的内容（用于更好地理解主题）
+     */
+    private async autoGenerateSessionTitle(userQuestion: string, aiAnswer: string): Promise<void> {
+        try {
+            const currentSession = this.sessionManager.getCurrentSession();
+            if (!currentSession) return;
+
+            // 检查会话名称是否为默认格式（"新会话 + 时间"）
+            const isDefaultName = /^新会话 \d{2}-\d{2} \d{2}:\d{2}$/.test(currentSession.sessionName);
+            
+            // 检查是否是第一次提问（只有2条消息：1条用户消息 + 1条AI消息）
+            const isFirstQuestion = currentSession.messages.length === 2;
+
+            if (!isDefaultName || !isFirstQuestion) {
+                return; // 不是默认名称或不是第一次提问，不处理
+            }
+
+            // 调用后端API生成主题名称
+            const generatedTitle = await this.generateSessionTitleFromBackend(userQuestion, aiAnswer);
+            
+            if (generatedTitle && generatedTitle.trim()) {
+                // 验证并更新会话名称
+                const validation = this.sessionManager.validateSessionName(generatedTitle);
+                if (validation.valid) {
+                    await this.sessionManager.renameSession(currentSession.sessionId, generatedTitle.trim());
+                    console.log('会话主题已自动生成:', generatedTitle);
+                } else {
+                    console.warn('生成的主题名称无效，使用默认名称');
+                }
+            }
+        } catch (e) {
+            console.error('自动生成会话主题失败:', e);
+            // 静默失败，不影响正常使用
+        }
+    }
+
+    /**
+     * 调用后端API生成会话主题名称
+     * 使用 chat 接口，传入构建好的 prompt
+     * @param userQuestion 用户问题
+     * @param aiAnswer AI回答
+     * @returns 生成的主题名称
+     */
+    private async generateSessionTitleFromBackend(userQuestion: string, aiAnswer: string): Promise<string | null> {
+        try {
+            const backendUrl = this.plugin.settings.javaBackendUrl.replace(/\/$/, '');
+            const chatUrl = `${backendUrl}/api/rag/chat`;
+
+            // 使用高级设置中的标题生成配置，如果没有配置则使用 LLM 配置
+            const providerCode = this.plugin.settings.titleGenerationProvider || this.plugin.settings.selectedLlmProvider;
+            const apiKey = this.plugin.settings.titleGenerationApiKey || this.plugin.settings.llmApiKey;
+            const modelName = this.plugin.settings.titleGenerationModelName || this.plugin.settings.llmModelName;
+
+            // 如果 API Key 为空，无法生成标题
+            if (!apiKey || !apiKey.trim()) {
+                console.debug('标题生成 API Key 未配置，跳过自动生成');
+                return null;
+            }
+
+            // 构建提示词：要求生成简洁的主题名称
+            const prompt = `请根据以下对话内容，生成一个简洁的会话主题名称（不超过20个字符，不要包含"新会话"、"关于"等前缀词，直接给出核心主题）：
+
+用户问题：${userQuestion}
+
+AI回答：${aiAnswer.substring(0, 200)}${aiAnswer.length > 200 ? '...' : ''}
+
+请只返回主题名称，不要包含任何其他说明文字。`;
+
+            // 调用 chat 接口（非流式）
+            const response = await fetch(chatUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-KEY': apiKey
+                },
+                body: JSON.stringify({
+                    question: prompt,
+                    provider: providerCode,
+                    model: modelName,
+                    history: [] // 空历史，只生成标题
+                })
+            });
+
+            if (!response.ok) {
+                console.warn('生成主题名称API调用失败:', response.status);
+                return null;
+            }
+
+            const data = await response.json();
+            const title = this.extractTitleFromResponse(data);
+
+            return title;
+        } catch (e) {
+            console.error('调用后端API生成主题名称失败:', e);
+            return null;
+        }
+    }
+
+    /**
+     * 从后端响应中提取标题
+     * @param data 后端响应数据（RagResponse 结构）
+     * @returns 提取的标题，如果提取失败返回null
+     */
+    private extractTitleFromResponse(data: any): string | null {
+        try {
+            let title: string | null = null;
+            
+            // 调试：打印完整响应结构
+            console.debug('标题生成响应数据:', JSON.stringify(data, null, 2));
+            
+            if (typeof data === 'string') {
+                title = data.trim();
+            } else if (data && typeof data === 'object') {
+                // RagResponse 结构：优先从 data 字段提取
+                if (data.data !== undefined) {
+                    // 如果 data 是字符串，直接使用
+                    if (typeof data.data === 'string') {
+                        title = data.data.trim();
+                    }
+                    // 如果 data 是对象，尝试提取 answer 或 content
+                    else if (typeof data.data === 'object' && data.data !== null) {
+                        title = data.data.answer || data.data.content || data.data.text || null;
+                        if (title) {
+                            title = String(title).trim();
+                        }
+                    }
+                }
+                
+                // 如果 data 字段没有内容，尝试从其他常见字段提取（但排除 message，因为它可能是状态消息）
+                if (!title) {
+                    title = data.title || data.content || data.text || data.answer || null;
+                    if (title) {
+                        title = String(title).trim();
+                    }
+                }
+            }
+
+            // 清理标题：移除可能的引号、多余空格、换行等
+            if (title) {
+                // 过滤掉常见的状态消息（如 "Success", "OK" 等）
+                const statusMessages = ['success', 'ok', 'successful', '完成', '成功'];
+                if (statusMessages.some(msg => title!.toLowerCase() === msg.toLowerCase())) {
+                    console.warn('提取到状态消息而非标题，跳过:', title);
+                    return null;
+                }
+                
+                title = title
+                    .replace(/^["']|["']$/g, '') // 移除首尾引号
+                    .replace(/\n+/g, ' ') // 将换行符替换为空格
+                    .replace(/\s+/g, ' ') // 合并多个空格
+                    .trim();
+                
+                // 限制长度（会话名称最大50字符，但主题名称建议不超过20字符）
+                if (title.length > 50) {
+                    title = title.substring(0, 47) + '...';
+                }
+            }
+
+            return title || null;
+        } catch (e) {
+            console.error('提取标题失败:', e);
+            return null;
+        }
     }
 }
