@@ -298,7 +298,9 @@ export class ChatView extends ItemView {
         const messages = this.sessionManager.getMessages();
         for (const msg of messages) {
             const displayType: 'user' | 'ai' = msg.role === 'assistant' ? 'ai' : 'user';
-            await this.appendMessage(messageHistory, msg.content, displayType);
+            // 传递思考过程（如果有）
+            const thinking = msg.role === 'assistant' ? (msg.thinking || null) : null;
+            await this.appendMessage(messageHistory, msg.content, displayType, false, false, thinking);
         }
         messageHistory.scrollTo({ top: messageHistory.scrollHeight });
 
@@ -341,8 +343,11 @@ export class ChatView extends ItemView {
             let answerBuffer = '';
             let thinkingPanel: HTMLElement | null = null;
             let thinkingContent: HTMLElement | null = null;
+            let thinkingHeader: HTMLElement | null = null;
+            let thinkingIconContainer: HTMLElement | null = null;
             let answerContainer: HTMLElement | null = null;
             let isStreaming = true;
+            let hasStartedAnswering = false; // 标记是否已开始回答
 
             // 渲染节流控制
             let renderTimer: NodeJS.Timeout | null = null;
@@ -352,10 +357,10 @@ export class ChatView extends ItemView {
             // 创建思考面板（如果启用深度思考）
             if (this.plugin.settings.enableDeepThinking) {
                 thinkingPanel = msgBubble.createEl('div', { cls: 'thinking-panel' });
-                const header = thinkingPanel.createEl('div', { cls: 'thinking-panel__header' });
-                const iconContainer = header.createEl('span', { cls: 'thinking-panel__icon' });
-                setIcon(iconContainer, 'chevron-down'); // 默认展开状态
-                header.createEl('span', { cls: 'thinking-panel__title', text: '思考过程' });
+                thinkingHeader = thinkingPanel.createEl('div', { cls: 'thinking-panel__header' });
+                thinkingIconContainer = thinkingHeader.createEl('span', { cls: 'thinking-panel__icon' });
+                setIcon(thinkingIconContainer, 'chevron-down'); // 默认展开状态
+                thinkingHeader.createEl('span', { cls: 'thinking-panel__title', text: '思考过程' });
                 thinkingContent = thinkingPanel.createEl('div', {
                     cls: 'thinking-panel__content thinking-panel__content--expanded'
                 });
@@ -363,19 +368,19 @@ export class ChatView extends ItemView {
 
                 // 绑定折叠/展开功能
                 let isExpanded = true;
-                header.addEventListener('click', () => {
+                thinkingHeader.addEventListener('click', () => {
                     isExpanded = !isExpanded;
 
                     if (isExpanded) {
                         thinkingContent!.removeClass('thinking-panel__content--collapsed');
                         thinkingContent!.addClass('thinking-panel__content--expanded');
-                        iconContainer.empty();
-                        setIcon(iconContainer, 'chevron-down');
+                        thinkingIconContainer!.empty();
+                        setIcon(thinkingIconContainer!, 'chevron-down');
                     } else {
                         thinkingContent!.removeClass('thinking-panel__content--expanded');
                         thinkingContent!.addClass('thinking-panel__content--collapsed');
-                        iconContainer.empty();
-                        setIcon(iconContainer, 'chevron-right');
+                        thinkingIconContainer!.empty();
+                        setIcon(thinkingIconContainer!, 'chevron-right');
                     }
                 });
             }
@@ -458,8 +463,22 @@ export class ChatView extends ItemView {
                         thinkingContent!.setText(processedThinking);
                     }
 
-                    // 滚动到底部
-                    messageHistory.scrollTo({ top: messageHistory.scrollHeight, behavior: 'smooth' });
+                    // 滚动到思考面板（确保思考内容可见）
+                    if (thinkingPanel) {
+                        // 计算思考面板相对于消息历史容器的位置
+                        const panelRect = thinkingPanel.getBoundingClientRect();
+                        const containerRect = messageHistory.getBoundingClientRect();
+                        const relativeTop = panelRect.top - containerRect.top + messageHistory.scrollTop;
+                        
+                        // 滚动到思考面板位置，确保面板在视口内
+                        messageHistory.scrollTo({ 
+                            top: relativeTop - 20, // 留出一些顶部间距
+                            behavior: 'smooth' 
+                        });
+                    } else {
+                        // 如果没有思考面板，滚动到底部
+                        messageHistory.scrollTo({ top: messageHistory.scrollHeight, behavior: 'smooth' });
+                    }
 
                     thinkingRenderTimer = null;
                 }, 100); // ⚠️ 优化：思考内容渲染节流从 200ms 减少到 100ms，提升更新速度
@@ -498,6 +517,16 @@ export class ChatView extends ItemView {
                     },
                     // onAnswer 回调
                     (answerData: string) => {
+                        // 第一次收到回答数据时，自动折叠思考面板
+                        if (!hasStartedAnswering && thinkingPanel && thinkingContent && thinkingIconContainer) {
+                            hasStartedAnswering = true;
+                            // 折叠思考面板
+                            thinkingContent.removeClass('thinking-panel__content--expanded');
+                            thinkingContent.addClass('thinking-panel__content--collapsed');
+                            thinkingIconContainer.empty();
+                            setIcon(thinkingIconContainer, 'chevron-right');
+                        }
+
                         answerBuffer += answerData;
                         // 添加流式样式类（用于显示打字机光标效果）
                         if (answerContainer && !answerContainer.hasClass('streaming')) {
@@ -578,9 +607,13 @@ export class ChatView extends ItemView {
                             this.addFullCopyButton(msgBubble, answerBuffer);
                         }
 
-                        // 保存到会话历史（仅保存 answer，不保存 thinking）
+                        // 保存到会话历史（同时保存 answer 和 thinking）
                         if (answerBuffer) {
-                            this.sessionManager.addMessage({ role: 'assistant', content: answerBuffer });
+                            this.sessionManager.addMessage({ 
+                                role: 'assistant', 
+                                content: answerBuffer,
+                                thinking: thinkingBuffer || null // 保存思考过程
+                            });
                             await this.sessionManager.saveSession(this.sessionManager.getCurrentSession()!);
                         }
 
@@ -634,7 +667,9 @@ export class ChatView extends ItemView {
             const messages = this.sessionManager.getMessages();
             for (const msg of messages) {
                 const displayType: 'user' | 'ai' = msg.role === 'assistant' ? 'ai' : 'user';
-                await this.appendMessage(messageHistory, msg.content, displayType);
+                // 传递思考过程（如果有）
+                const thinking = msg.role === 'assistant' ? (msg.thinking || null) : null;
+                await this.appendMessage(messageHistory, msg.content, displayType, false, false, thinking);
             }
 
             // 更新会话名称显示(如果需要可以添加)
@@ -675,7 +710,9 @@ export class ChatView extends ItemView {
                 const messages = this.sessionManager.getMessages();
                 for (const msg of messages) {
                     const displayType: 'user' | 'ai' = msg.role === 'assistant' ? 'ai' : 'user';
-                    await this.appendMessage(messageHistory, msg.content, displayType);
+                    // 传递思考过程（如果有）
+                    const thinking = msg.role === 'assistant' ? (msg.thinking || null) : null;
+                    await this.appendMessage(messageHistory, msg.content, displayType, false, false, thinking);
                 }
 
                 // 更新会话名称显示(如果需要可以添加)
@@ -963,17 +1000,11 @@ export class ChatView extends ItemView {
     ): Promise<void> {
         let buffer = '';
         let abortController: AbortController | null = null;
-        let timeoutId: NodeJS.Timeout | null = null;
 
         try {
             abortController = new AbortController();
 
-            // 设置超时（60秒）
-            timeoutId = setTimeout(() => {
-                abortController?.abort();
-                onError(new Error('请求超时，请检查网络连接后重试'));
-            }, 60000);
-
+            // 不设置超时限制，允许长时间流式响应
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {
@@ -1033,12 +1064,6 @@ export class ChatView extends ItemView {
                     }
                 }
 
-                // 清除超时定时器
-                if (timeoutId) {
-                    clearTimeout(timeoutId);
-                    timeoutId = null;
-                }
-
                 onComplete();
 
             } catch (readError: any) {
@@ -1051,11 +1076,6 @@ export class ChatView extends ItemView {
             }
 
         } catch (error: any) {
-            // 清除超时定时器
-            if (timeoutId) {
-                clearTimeout(timeoutId);
-            }
-
             if (error.name === 'AbortError') {
                 onError(new Error('请求已中止'));
             } else if (error.message) {

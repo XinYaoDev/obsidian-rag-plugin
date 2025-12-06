@@ -5,6 +5,7 @@ import { App, TFile, Notice } from 'obsidian';
 export interface SessionMessage {
     role: 'user' | 'assistant';
     content: string;
+    thinking?: string | null; // 思考过程（仅 assistant 消息可能有）
 }
 
 // 会话元数据接口
