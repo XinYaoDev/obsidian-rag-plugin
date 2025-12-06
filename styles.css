@@ -1013,6 +1013,20 @@
     content: none !important;
 }
 
+/* 隐藏代码块内部可能存在的语言标签元素 */
+.code-block-wrapper pre code::before,
+.code-block-wrapper pre code::after {
+    display: none !important;
+    content: none !important;
+}
+
+/* 确保代码块内部没有额外的语言标签显示 */
+.code-block-wrapper code[class*="language-"]::before,
+.code-block-wrapper code[class*="language-"]::after {
+    display: none !important;
+    content: none !important;
+}
+
 /* 隐藏Obsidian或第三方插件生成的复制按钮（排除我们自定义的按钮） */
 .code-block-wrapper .copy-code-button,
 .code-block-wrapper .copy-button,

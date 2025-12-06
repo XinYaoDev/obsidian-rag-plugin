@@ -1290,9 +1290,14 @@ export class ChatView extends ItemView {
 
     // 为代码块添加包裹容器、Header Bar和复制按钮
     private wrapCodeBlocks(container: HTMLElement) {
-        const codeBlocks = container.querySelectorAll('pre');
+        const codeBlocks = container.querySelectorAll('pre:not(.code-block-wrapper pre)');
 
         codeBlocks.forEach((pre) => {
+            // 跳过已经被包裹的代码块
+            if (pre.parentElement?.classList.contains('code-block-wrapper')) {
+                return;
+            }
+
             // 创建包裹容器
             const wrapper = document.createElement('div');
             wrapper.className = 'code-block-wrapper';
@@ -1321,13 +1326,16 @@ export class ChatView extends ItemView {
             header.appendChild(langLabel);
 
             // 右侧：复制按钮
-            const copyBtn = this.createCodeCopyButton(pre);
+            const copyBtn = this.createCodeCopyButton(pre as HTMLElement);
             header.appendChild(copyBtn);
 
-            // 组装结构
-            pre.parentNode?.insertBefore(wrapper, pre);
-            wrapper.appendChild(header);
-            wrapper.appendChild(pre);
+            // 组装结构：先插入 wrapper，然后移动 pre 到 wrapper 内部
+            const parent = pre.parentElement;
+            if (parent) {
+                parent.insertBefore(wrapper, pre);
+                wrapper.appendChild(header);
+                wrapper.appendChild(pre as HTMLElement);
+            }
         });
     }
 
