@@ -1500,6 +1500,11 @@ export class ChatView extends ItemView {
             // 为代码块添加包裹容器和复制按钮
             this.wrapCodeBlocks(msgBubble);
 
+            // 为用户消息添加笔记链接的 Ctrl+点击跳转功能
+            if (type === 'user') {
+                this.makeNoteLinksClickable(msgBubble);
+            }
+
             // 为 AI 消息添加全文复制按钮（非错误消息）
             if (type === 'ai' && !isError) {
                 this.addFullCopyButton(msgBubble, text);
@@ -1871,6 +1876,44 @@ export class ChatView extends ItemView {
             new Notice('复制失败，请重试');
             return false;
         }
+    }
+
+    // 为用户消息中的笔记链接添加 Ctrl+点击跳转功能
+    private makeNoteLinksClickable(container: HTMLElement): void {
+        // 查找所有内部链接（Obsidian 渲染的 [[笔记]] 会变成 <a> 标签）
+        // 内部链接通常有 data-href 属性，格式为 "笔记名称" 或 "笔记名称|显示文本"
+        const internalLinks = container.querySelectorAll('a.internal-link');
+        
+        internalLinks.forEach((linkEl) => {
+            const link = linkEl as HTMLElement;
+            const href = link.getAttribute('data-href') || link.getAttribute('href');
+            if (!href) return;
+
+            // 提取笔记名称（去掉可能的锚点或别名）
+            const noteName = href.split('|')[0].split('#')[0].trim();
+            if (!noteName) return;
+
+            // 添加点击事件监听器
+            link.addEventListener('click', async (e: MouseEvent) => {
+                // 只在 Ctrl+点击（或 Cmd+点击）时跳转
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    try {
+                        // 使用 Obsidian API 打开笔记
+                        await this.app.workspace.openLinkText(noteName, '');
+                    } catch (err) {
+                        console.error('打开笔记失败:', err);
+                        new Notice(`无法打开笔记: ${noteName}`);
+                    }
+                }
+            });
+
+            // 添加样式提示（可选：添加鼠标悬停提示）
+            link.setAttribute('title', `Ctrl+点击打开: ${noteName}`);
+            link.style.cursor = 'pointer';
+        });
     }
 
     /**
