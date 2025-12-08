@@ -559,14 +559,26 @@ export class ChatView extends ItemView {
                     }
                 }
 
-                // 发起流式请求
+            // 构造历史记录（去掉刚刚添加的当前用户提问，避免 question 与 history 重复）
+            const fullHistory = this.sessionManager.getMessages();
+            const payloadHistory = (() => {
+                if (fullHistory.length === 0) return [];
+                const last = fullHistory[fullHistory.length - 1];
+                // 仅当最后一条是当前用户的提问时才剔除，避免误删历史消息
+                if (last.role === 'user' && last.content === content) {
+                    return fullHistory.slice(0, fullHistory.length - 1);
+                }
+                return fullHistory;
+            })();
+
+            // 发起流式请求
                 await this.streamChat(
                     chatUrl,
                     {
                         question: content,
                         provider: providerCode,
                         model: modelName,
-                        history: this.sessionManager.getMessages(),
+                    history: payloadHistory,
                         enableDeepThinking: this.plugin.settings.enableDeepThinking
                     },
                     apiKey,
