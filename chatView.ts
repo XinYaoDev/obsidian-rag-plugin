@@ -262,8 +262,7 @@ export class ChatView extends ItemView {
         const inputEl = inputBoxContainer.createEl('div', {
             cls: 'chat-input',
             attr: {
-                contenteditable: 'true',
-                'data-placeholder': '输入问题，按 Ctrl+Enter 发送...'
+                contenteditable: 'true'
             }
         });
 
