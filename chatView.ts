@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, setIcon, Notice, MarkdownRenderer, TFile, normalizePath } from 'obsidian';
+import { App, ItemView, WorkspaceLeaf, setIcon, Notice, MarkdownRenderer, TFile, normalizePath, SuggestModal } from 'obsidian';
 import type RagPlugin from './main';
 import { SessionManager } from './sessionManager';
 import { RenameModal } from './renameModal';
@@ -267,6 +267,17 @@ export class ChatView extends ItemView {
             // 1. 如果正在使用输入法（比如打中文拼音时），按回车是为了选字，不应该发送
             if (e.isComposing) {
                 return;
+            }
+
+            // 1.5 监听“空格 + @”触发提示词选择
+            if (e.key === '@') {
+                const cursorPos = inputEl.selectionStart ?? 0;
+                const prevChar = cursorPos > 0 ? inputEl.value.charAt(cursorPos - 1) : '';
+                if (prevChar === ' ') {
+                    e.preventDefault();
+                    this.openPromptPicker(inputEl);
+                    return;
+                }
             }
 
             // 2. 处理上键/下键浏览历史记录
@@ -807,6 +818,47 @@ export class ChatView extends ItemView {
         } catch (e) {
             console.error('创建会话失败:', e);
             new Notice('创建会话失败');
+        }
+    }
+
+    // 打开提示词选择器（prompts 文件夹中的 md）
+    private openPromptPicker(inputEl: HTMLTextAreaElement) {
+        const promptFiles = this.getPromptFiles();
+        if (promptFiles.length === 0) {
+            new Notice('prompts 文件夹中没有可用的提示词文件');
+            return;
+        }
+
+        const modal = new PromptSuggestionModal(this.app, promptFiles, async (file) => {
+            await this.insertPromptContent(inputEl, file);
+        });
+        modal.open();
+    }
+
+    // 获取 prompts 文件夹下的所有 md 文件
+    private getPromptFiles(): TFile[] {
+        const files = this.app.vault.getFiles();
+        return files.filter(file => 
+            file.extension.toLowerCase() === 'md' &&
+            file.path.toLowerCase().startsWith('prompts/')
+        );
+    }
+
+    // 将提示词内容插入输入框当前位置
+    private async insertPromptContent(inputEl: HTMLTextAreaElement, file: TFile) {
+        try {
+            const content = await this.app.vault.read(file);
+            const start = inputEl.selectionStart ?? inputEl.value.length;
+            const end = inputEl.selectionEnd ?? inputEl.value.length;
+
+            // 不插入额外的 @ 字符，直接把内容放在光标处
+            const newValue = inputEl.value.slice(0, start) + content + inputEl.value.slice(end);
+            const newCursor = start + content.length;
+            inputEl.value = newValue;
+            inputEl.setSelectionRange(newCursor, newCursor);
+        } catch (e) {
+            console.error('读取提示词文件失败:', e);
+            new Notice('读取提示词失败');
         }
     }
 
@@ -1920,5 +1972,34 @@ AI回答：${aiAnswer.substring(0, 200)}${aiAnswer.length > 200 ? '...' : ''}
             console.error('提取标题失败:', e);
             return null;
         }
+    }
+}
+
+// 提示词选择弹窗：列出 prompts 目录下的 md 文件
+class PromptSuggestionModal extends SuggestModal<TFile> {
+    private promptFiles: TFile[];
+    private onChooseCallback: (file: TFile) => void;
+
+    constructor(app: App, promptFiles: TFile[], onChoose: (file: TFile) => void) {
+        super(app);
+        this.promptFiles = promptFiles;
+        this.onChooseCallback = onChoose;
+        this.setPlaceholder('选择提示词文件');
+    }
+
+    getSuggestions(query: string): TFile[] {
+        const lowerQuery = query.toLowerCase();
+        return this.promptFiles
+            .filter(file => file.basename.toLowerCase().includes(lowerQuery))
+            .sort((a, b) => a.basename.localeCompare(b.basename));
+    }
+
+    renderSuggestion(file: TFile, el: HTMLElement) {
+        el.createEl('div', { cls: 'prompt-suggest-title', text: file.basename });
+        el.createEl('div', { cls: 'prompt-suggest-path', text: file.path });
+    }
+
+    onChooseSuggestion(file: TFile) {
+        this.onChooseCallback(file);
     }
 }
