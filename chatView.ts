@@ -1,6 +1,6 @@
 import { App, ItemView, WorkspaceLeaf, setIcon, Notice, MarkdownRenderer, TFile, normalizePath, SuggestModal } from 'obsidian';
 import type RagPlugin from './main';
-import { SessionManager } from './sessionManager';
+import { SessionManager, type SessionMessage } from './sessionManager';
 import { RenameModal } from './renameModal';
 
 export const VIEW_TYPE_CHAT = "rag-chat-view";
@@ -280,6 +280,18 @@ export class ChatView extends ItemView {
                 }
             }
 
+            // 1.6 监听 "[[" 触发文档引用选择（按更新时间倒序，最多5条）
+            if (e.key === '[') {
+                const cursorPos = inputEl.selectionStart ?? 0;
+                const prevChar = cursorPos > 0 ? inputEl.value.charAt(cursorPos - 1) : '';
+                if (prevChar === '[') {
+                    e.preventDefault(); // 阻止第二个 "[" 输入
+                    // 将已有的单个 "[" 替换为 [[页面]]，记录替换起点
+                    this.openNotePicker(inputEl, cursorPos - 1);
+                    return;
+                }
+            }
+
             // 2. 处理上键/下键浏览历史记录
             if (e.key === 'ArrowUp') {
                 e.preventDefault();
@@ -325,8 +337,12 @@ export class ChatView extends ItemView {
         let currentUserInput: string = '';
 
         const sendMessage = async () => {
-            const content = inputEl.value.trim();
+            const rawInput = inputEl.value;
+            const content = rawInput.trim();
             if (!content) return;
+
+            // 展开 [[note]] 链接为笔记内容（仅发送/上下文使用，不在输入框显示）
+            const expandedQuestion = (await this.expandNoteLinks(content)).trim();
 
             // 保存用户输入
             currentUserInput = content;
@@ -581,15 +597,16 @@ export class ChatView extends ItemView {
                 }
                 return fullHistory;
             })();
+            const expandedHistory = await this.buildExpandedHistory(payloadHistory);
 
             // 发起流式请求
                 await this.streamChat(
                     chatUrl,
                     {
-                        question: content,
+                        question: expandedQuestion,
                         provider: providerCode,
                         model: modelName,
-                    history: payloadHistory,
+                        history: expandedHistory,
                         enableDeepThinking: this.plugin.settings.enableDeepThinking
                     },
                     apiKey,
@@ -833,6 +850,93 @@ export class ChatView extends ItemView {
             await this.insertPromptContent(inputEl, file);
         });
         modal.open();
+    }
+
+    // 打开文档引用选择器：[[ 触发，按更新时间倒序，最多5条，支持模糊匹配
+    private openNotePicker(inputEl: HTMLTextAreaElement, replaceStart: number) {
+        const modal = new NoteSuggestionModal(this.app, this.getRecentNotes(), async (file) => {
+            await this.insertNoteLink(inputEl, file, replaceStart);
+        });
+        modal.open();
+    }
+
+    // 获取最近更新的笔记，按 mtime 倒序
+    private getRecentNotes(): TFile[] {
+        const files = this.app.vault.getMarkdownFiles();
+        return files
+            .slice()
+            .sort((a, b) => b.stat.mtime - a.stat.mtime);
+    }
+
+    // 将 [[页面]] 插入到输入框，替换触发时的单个 "["
+    private async insertNoteLink(inputEl: HTMLTextAreaElement, file: TFile, replaceStart: number) {
+        const linkText = `[[${file.basename}]]`;
+        const end = inputEl.selectionEnd ?? inputEl.value.length;
+
+        // replaceStart 指向已存在的单个 "["，用完整链接替换
+        const newValue = inputEl.value.slice(0, replaceStart) + linkText + inputEl.value.slice(end);
+        const newCursor = replaceStart + linkText.length;
+        inputEl.value = newValue;
+        inputEl.setSelectionRange(newCursor, newCursor);
+    }
+
+    // 将 [[note]] 展开为笔记内容，仅用于发送给后端，不改变输入框和 UI 展示
+    private async expandNoteLinks(text: string): Promise<string> {
+        const pattern = /\[\[([^\]]+)\]\]/g;
+        const files = this.app.vault.getMarkdownFiles();
+        const cache = new Map<string, string | null>(); // name -> cleaned content
+
+        const resolveNote = async (name: string): Promise<string | null> => {
+            if (cache.has(name)) return cache.get(name)!;
+            const match = files.find(f => f.basename.toLowerCase() === name.toLowerCase());
+            if (!match) {
+                cache.set(name, null);
+                return null;
+            }
+            try {
+                const raw = await this.app.vault.read(match);
+                const cleaned = this.cleanPromptContent(raw); // 复用去 frontmatter + trim
+                cache.set(name, cleaned);
+                return cleaned;
+            } catch (e) {
+                console.error('读取引用笔记失败:', name, e);
+                cache.set(name, null);
+                return null;
+            }
+        };
+
+        const replacements: Array<Promise<{ placeholder: string; value: string }>> = [];
+        let match: RegExpExecArray | null;
+        while ((match = pattern.exec(text)) !== null) {
+            const noteName = match[1].trim();
+            if (!noteName) continue;
+            const placeholder = match[0];
+            replacements.push((async () => {
+                const noteContent = await resolveNote(noteName);
+                if (!noteContent) return { placeholder, value: placeholder }; // 找不到则保留原样
+                // 在请求中插入可辨识的引用块，避免混淆
+                const block = `\n[引用: ${noteName}]\n${noteContent}\n`;
+                return { placeholder, value: block };
+            })());
+        }
+
+        const resolved = await Promise.all(replacements);
+        let expanded = text;
+        for (const { placeholder, value } of resolved) {
+            expanded = expanded.replace(placeholder, value);
+        }
+        return expanded;
+    }
+
+    // 构造用于请求的历史：对用户消息进行笔记展开，AI 消息保持不变
+    private async buildExpandedHistory(messages: SessionMessage[]): Promise<SessionMessage[]> {
+        const expanded = await Promise.all(messages.map(async (msg) => {
+            if (msg.role === 'user') {
+                return { ...msg, content: await this.expandNoteLinks(msg.content) };
+            }
+            return msg;
+        }));
+        return expanded;
     }
 
     // 获取 prompts 文件夹下的所有 md 文件
@@ -2011,6 +2115,43 @@ class PromptSuggestionModal extends SuggestModal<TFile> {
     renderSuggestion(file: TFile, el: HTMLElement) {
         el.createEl('div', { cls: 'prompt-suggest-title', text: file.basename });
         el.createEl('div', { cls: 'prompt-suggest-path', text: file.path });
+    }
+
+    onChooseSuggestion(file: TFile) {
+        this.onChooseCallback(file);
+    }
+}
+
+// 文档引用选择弹窗：按更新时间倒序，仅展示最多5条，支持模糊匹配
+class NoteSuggestionModal extends SuggestModal<TFile> {
+    private notes: TFile[];
+    private onChooseCallback: (file: TFile) => void;
+
+    constructor(app: App, notes: TFile[], onChoose: (file: TFile) => void) {
+        super(app);
+        this.notes = notes;
+        this.onChooseCallback = onChoose;
+        this.setPlaceholder('选择最近更新的笔记（最多5条）');
+    }
+
+    getSuggestions(query: string): TFile[] {
+        const lowerQuery = query.toLowerCase();
+        const filtered = this.notes.filter(file =>
+            file.basename.toLowerCase().includes(lowerQuery)
+        );
+        // 按更新时间倒序，取前5条
+        return filtered
+            .sort((a, b) => b.stat.mtime - a.stat.mtime)
+            .slice(0, 5);
+    }
+
+    renderSuggestion(file: TFile, el: HTMLElement) {
+        el.createEl('div', { cls: 'prompt-suggest-title', text: file.basename });
+        const updated = new Date(file.stat.mtime);
+        const meta = `${updated.getFullYear()}-${(updated.getMonth() + 1)
+            .toString().padStart(2, '0')}-${updated.getDate().toString().padStart(2, '0')} ${updated.getHours()
+            .toString().padStart(2, '0')}:${updated.getMinutes().toString().padStart(2, '0')}`;
+        el.createEl('div', { cls: 'prompt-suggest-path', text: meta });
     }
 
     onChooseSuggestion(file: TFile) {
