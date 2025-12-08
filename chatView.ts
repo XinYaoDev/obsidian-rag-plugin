@@ -847,7 +847,14 @@ export class ChatView extends ItemView {
     // 将提示词内容插入输入框当前位置
     private async insertPromptContent(inputEl: HTMLTextAreaElement, file: TFile) {
         try {
-            const content = await this.app.vault.read(file);
+            const raw = await this.app.vault.read(file);
+            const content = this.cleanPromptContent(raw);
+
+            if (!content) {
+                new Notice('提示词内容为空');
+                return;
+            }
+
             const start = inputEl.selectionStart ?? inputEl.value.length;
             const end = inputEl.selectionEnd ?? inputEl.value.length;
 
@@ -860,6 +867,13 @@ export class ChatView extends ItemView {
             console.error('读取提示词文件失败:', e);
             new Notice('读取提示词失败');
         }
+    }
+
+    // 清洗提示词内容：移除最前面的 frontmatter（--- 包裹）并去除首尾空白
+    private cleanPromptContent(raw: string): string {
+        // 去掉开头的空白后，检查 frontmatter
+        const cleanedFrontmatter = raw.replace(/^\s*---[\s\S]*?---\s*/m, '');
+        return cleanedFrontmatter.trim();
     }
 
     // 删除会话（直接删除，不确认）
