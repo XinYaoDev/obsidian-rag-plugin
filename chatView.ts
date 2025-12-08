@@ -258,9 +258,47 @@ export class ChatView extends ItemView {
         const inputRowContainer = inputArea.createEl('div', { cls: 'input-row-container' });
         const inputBoxContainer = inputRowContainer.createEl('div', { cls: 'input-box-container' });
 
-        const inputEl = inputBoxContainer.createEl('textarea', {
-            placeholder: '输入问题，按 Ctrl+Enter 发送...',
-            cls: 'chat-input'
+        // 使用 contenteditable div 替代 textarea，支持渲染 [[笔记]] 链接
+        const inputEl = inputBoxContainer.createEl('div', {
+            cls: 'chat-input',
+            attr: {
+                contenteditable: 'true',
+                'data-placeholder': '输入问题，按 Ctrl+Enter 发送...'
+            }
+        });
+
+        // 实时渲染 [[笔记]] 为链接
+        let renderTimer: NodeJS.Timeout | null = null;
+        const renderNoteLinks = () => {
+            if (renderTimer) clearTimeout(renderTimer);
+            renderTimer = setTimeout(() => {
+                this.renderNoteLinksInInput(inputEl);
+            }, 100); // 防抖，避免频繁渲染
+        };
+
+        inputEl.addEventListener('input', renderNoteLinks);
+        inputEl.addEventListener('paste', () => {
+            setTimeout(renderNoteLinks, 10); // 粘贴后延迟渲染
+        });
+
+        // 添加 Ctrl+点击跳转功能
+        inputEl.addEventListener('click', (e: MouseEvent) => {
+            if (e.ctrlKey || e.metaKey) {
+                const target = e.target as HTMLElement;
+                const link = target.closest('a.internal-link') as HTMLElement;
+                if (link) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const noteName = link.getAttribute('data-href') || link.textContent || '';
+                    if (noteName) {
+                        const cleanName = noteName.split('|')[0].split('#')[0].trim();
+                        this.app.workspace.openLinkText(cleanName, '').catch(err => {
+                            console.error('打开笔记失败:', err);
+                            new Notice(`无法打开笔记: ${cleanName}`);
+                        });
+                    }
+                }
+            }
         });
 
         inputEl.addEventListener('keydown', (e) => {
@@ -271,43 +309,68 @@ export class ChatView extends ItemView {
 
             // 1.5 监听“空格 + @”触发提示词选择
             if (e.key === '@') {
-                const cursorPos = inputEl.selectionStart ?? 0;
-                const prevChar = cursorPos > 0 ? inputEl.value.charAt(cursorPos - 1) : '';
-                if (prevChar === ' ') {
-                    e.preventDefault();
-                    this.openPromptPicker(inputEl);
-                    return;
+                const selection = window.getSelection();
+                const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+                if (range) {
+                    const textBefore = range.startContainer.textContent || '';
+                    const offset = range.startOffset;
+                    const prevChar = offset > 0 ? textBefore.charAt(offset - 1) : '';
+                    if (prevChar === ' ') {
+                        e.preventDefault();
+                        this.openPromptPicker(inputEl);
+                        return;
+                    }
                 }
             }
 
             // 1.6 监听 "[[" 触发文档引用选择（按更新时间倒序，最多5条）
             if (e.key === '[') {
-                const cursorPos = inputEl.selectionStart ?? 0;
-                const prevChar = cursorPos > 0 ? inputEl.value.charAt(cursorPos - 1) : '';
-                if (prevChar === '[') {
-                    e.preventDefault(); // 阻止第二个 "[" 输入
-                    // 将已有的单个 "[" 替换为 [[页面]]，记录替换起点
-                    this.openNotePicker(inputEl, cursorPos - 1);
-                    return;
+                const selection = window.getSelection();
+                const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+                if (range) {
+                    const textBefore = range.startContainer.textContent || '';
+                    const offset = range.startOffset;
+                    const prevChar = offset > 0 ? textBefore.charAt(offset - 1) : '';
+                    if (prevChar === '[') {
+                        e.preventDefault();
+                        const replaceStart = this.getTextPositionBeforeCursor(inputEl);
+                        this.openNotePicker(inputEl, replaceStart);
+                        return;
+                    }
                 }
             }
 
             // 2. 处理上键/下键浏览历史记录
-            if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                this.navigateHistory(inputEl, -1);
-                return;
+            if (e.key === 'ArrowUp' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0) {
+                    const range = selection.getRangeAt(0);
+                    // 如果光标不在第一行，允许正常移动
+                    const textBeforeCursor = range.startContainer.textContent?.substring(0, range.startOffset) || '';
+                    if (!textBeforeCursor.includes('\n')) {
+                        e.preventDefault();
+                        this.navigateHistory(inputEl, -1);
+                        return;
+                    }
+                }
             }
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                this.navigateHistory(inputEl, 1);
-                return;
+            if (e.key === 'ArrowDown' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0) {
+                    const range = selection.getRangeAt(0);
+                    const textAfterCursor = range.startContainer.textContent?.substring(range.startOffset) || '';
+                    if (!textAfterCursor.includes('\n')) {
+                        e.preventDefault();
+                        this.navigateHistory(inputEl, 1);
+                        return;
+                    }
+                }
             }
 
             // 3. 如果只按了 Enter (没有按 Shift)
             if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault(); // 阻止默认的换行行为
-                sendMessage();      // 执行发送
+                e.preventDefault();
+                sendMessage();
             }
         });
 
@@ -337,7 +400,7 @@ export class ChatView extends ItemView {
         let currentUserInput: string = '';
 
         const sendMessage = async () => {
-            const rawInput = inputEl.value;
+            const rawInput = this.getTextFromContentEditable(inputEl);
             const content = rawInput.trim();
             if (!content) return;
 
@@ -362,7 +425,8 @@ export class ChatView extends ItemView {
             // 保存到输入历史记录
             this.addToInputHistory(content);
 
-            inputEl.value = '';
+            // 清空输入框
+            inputEl.innerHTML = '';
             inputEl.style.height = 'auto';
 
             // 显示并保存用户问题
@@ -558,7 +622,9 @@ export class ChatView extends ItemView {
                 await this.sessionManager.saveSession(this.sessionManager.getCurrentSession()!);
 
                 // 恢复用户输入到输入框
-                inputEl.value = currentUserInput;
+                inputEl.textContent = currentUserInput;
+                this.renderNoteLinksInInput(inputEl);
+                this.setCursorToEnd(inputEl);
                 inputEl.focus();
 
                 // 恢复发送按钮
@@ -839,7 +905,7 @@ export class ChatView extends ItemView {
     }
 
     // 打开提示词选择器（prompts 文件夹中的 md）
-    private openPromptPicker(inputEl: HTMLTextAreaElement) {
+    private openPromptPicker(inputEl: HTMLElement) {
         const promptFiles = this.getPromptFiles();
         if (promptFiles.length === 0) {
             new Notice('prompts 文件夹中没有可用的提示词文件');
@@ -853,7 +919,7 @@ export class ChatView extends ItemView {
     }
 
     // 打开文档引用选择器：[[ 触发，按更新时间倒序，最多5条，支持模糊匹配
-    private openNotePicker(inputEl: HTMLTextAreaElement, replaceStart: number) {
+    private openNotePicker(inputEl: HTMLElement, replaceStart: number) {
         const modal = new NoteSuggestionModal(this.app, this.getRecentNotes(), async (file) => {
             await this.insertNoteLink(inputEl, file, replaceStart);
         });
@@ -869,15 +935,25 @@ export class ChatView extends ItemView {
     }
 
     // 将 [[页面]] 插入到输入框，替换触发时的单个 "["
-    private async insertNoteLink(inputEl: HTMLTextAreaElement, file: TFile, replaceStart: number) {
+    private async insertNoteLink(inputEl: HTMLElement, file: TFile, replaceStart: number) {
         const linkText = `[[${file.basename}]]`;
-        const end = inputEl.selectionEnd ?? inputEl.value.length;
-
-        // replaceStart 指向已存在的单个 "["，用完整链接替换
-        const newValue = inputEl.value.slice(0, replaceStart) + linkText + inputEl.value.slice(end);
-        const newCursor = replaceStart + linkText.length;
-        inputEl.value = newValue;
-        inputEl.setSelectionRange(newCursor, newCursor);
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            // 删除触发时的单个 "["
+            range.setStart(range.startContainer, Math.max(0, range.startOffset - 1));
+            range.deleteContents();
+            // 插入完整链接
+            const textNode = document.createTextNode(linkText);
+            range.insertNode(textNode);
+            // 移动光标到链接末尾
+            range.setStartAfter(textNode);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+        // 延迟渲染，确保文本已插入
+        setTimeout(() => this.renderNoteLinksInInput(inputEl), 10);
     }
 
     // 将 [[note]] 展开为笔记内容，仅用于发送给后端，不改变输入框和 UI 展示
@@ -949,7 +1025,7 @@ export class ChatView extends ItemView {
     }
 
     // 将提示词内容插入输入框当前位置
-    private async insertPromptContent(inputEl: HTMLTextAreaElement, file: TFile) {
+    private async insertPromptContent(inputEl: HTMLElement, file: TFile) {
         try {
             const raw = await this.app.vault.read(file);
             const content = this.cleanPromptContent(raw);
@@ -959,14 +1035,9 @@ export class ChatView extends ItemView {
                 return;
             }
 
-            const start = inputEl.selectionStart ?? inputEl.value.length;
-            const end = inputEl.selectionEnd ?? inputEl.value.length;
-
-            // 不插入额外的 @ 字符，直接把内容放在光标处
-            const newValue = inputEl.value.slice(0, start) + content + inputEl.value.slice(end);
-            const newCursor = start + content.length;
-            inputEl.value = newValue;
-            inputEl.setSelectionRange(newCursor, newCursor);
+            this.insertTextAtCursor(inputEl, content);
+            // 延迟渲染，确保文本已插入
+            setTimeout(() => this.renderNoteLinksInInput(inputEl), 10);
         } catch (e) {
             console.error('读取提示词文件失败:', e);
             new Notice('读取提示词失败');
@@ -1219,13 +1290,15 @@ export class ChatView extends ItemView {
     }
 
     // 浏览历史记录
-    private navigateHistory(inputEl: HTMLTextAreaElement, direction: number): void {
+    private navigateHistory(inputEl: HTMLElement, direction: number): void {
         if (this.inputHistory.length === 0) {
             return;
         }
 
+        const currentText = this.getTextFromContentEditable(inputEl);
+
         // 如果当前在最新位置（-1），且用户正在输入内容，先保存当前输入
-        if (this.inputHistoryIndex === -1 && inputEl.value.trim()) {
+        if (this.inputHistoryIndex === -1 && currentText.trim()) {
             // 不保存，只是浏览历史
         }
 
@@ -1248,17 +1321,20 @@ export class ChatView extends ItemView {
             } else {
                 // 到达最新位置，清空输入框
                 this.inputHistoryIndex = -1;
-                inputEl.value = '';
+                inputEl.innerHTML = '';
+                this.renderNoteLinksInInput(inputEl);
                 return;
             }
         }
 
         // 设置输入框内容
         if (this.inputHistoryIndex >= 0 && this.inputHistoryIndex < this.inputHistory.length) {
-            inputEl.value = this.inputHistory[this.inputHistoryIndex];
-            // 将光标移到末尾
+            const historyText = this.inputHistory[this.inputHistoryIndex];
+            inputEl.textContent = historyText;
+            // 延迟渲染链接，然后移动光标到末尾
             setTimeout(() => {
-                inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
+                this.renderNoteLinksInInput(inputEl);
+                this.setCursorToEnd(inputEl);
             }, 0);
         }
     }
@@ -1435,7 +1511,7 @@ export class ChatView extends ItemView {
     // ============================================================
     // 失败撤回方法
     // ============================================================
-    private async rollbackFailedMessage(inputEl: HTMLTextAreaElement) {
+    private async rollbackFailedMessage(inputEl: HTMLElement) {
         // 1. 从 DOM 移除用户消息气泡
         if (this.lastUserMessageElement) {
             this.lastUserMessageElement.remove();
@@ -1453,7 +1529,9 @@ export class ChatView extends ItemView {
 
         // 4. 将用户输入恢复到输入框
         if (this.lastUserInput) {
-            inputEl.value = this.lastUserInput;
+            inputEl.textContent = this.lastUserInput;
+            this.renderNoteLinksInInput(inputEl);
+            this.setCursorToEnd(inputEl);
             this.lastUserInput = null;
         }
 
@@ -1914,6 +1992,129 @@ export class ChatView extends ItemView {
             link.setAttribute('title', `Ctrl+点击打开: ${noteName}`);
             link.style.cursor = 'pointer';
         });
+    }
+
+    // ============================================================
+    // ContentEditable 输入框辅助方法
+    // ============================================================
+
+    // 从 contenteditable div 提取纯文本（去除 HTML 标签）
+    private getTextFromContentEditable(element: HTMLElement): string {
+        return element.textContent || element.innerText || '';
+    }
+
+    // 在输入框中渲染 [[笔记]] 为可点击链接
+    private renderNoteLinksInInput(inputEl: HTMLElement): void {
+        const text = this.getTextFromContentEditable(inputEl);
+        if (!text) {
+            inputEl.innerHTML = '';
+            return;
+        }
+
+        // 保存当前光标位置
+        const selection = window.getSelection();
+        let cursorOffset = 0;
+        if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            const preRange = range.cloneRange();
+            preRange.selectNodeContents(inputEl);
+            preRange.setEnd(range.startContainer, range.startOffset);
+            cursorOffset = preRange.toString().length;
+        }
+
+        // 将 [[笔记]] 替换为链接
+        const pattern = /\[\[([^\]]+)\]\]/g;
+        const html = text.replace(pattern, (match, noteName) => {
+            const cleanName = noteName.trim();
+            return `<a href="${cleanName}" data-href="${cleanName}" class="internal-link">[[${cleanName}]]</a>`;
+        });
+
+        // 设置 HTML 内容
+        inputEl.innerHTML = html;
+
+        // 恢复光标位置
+        if (selection && inputEl.childNodes.length > 0) {
+            try {
+                const walker = document.createTreeWalker(
+                    inputEl,
+                    NodeFilter.SHOW_TEXT,
+                    null
+                );
+                let currentOffset = 0;
+                let targetNode: Node | null = null;
+                let targetOffset = 0;
+
+                let node: Node | null;
+                while ((node = walker.nextNode())) {
+                    const nodeLength = node.textContent?.length || 0;
+                    if (currentOffset + nodeLength >= cursorOffset) {
+                        targetNode = node;
+                        targetOffset = cursorOffset - currentOffset;
+                        break;
+                    }
+                    currentOffset += nodeLength;
+                }
+
+                if (targetNode) {
+                    const range = document.createRange();
+                    range.setStart(targetNode, Math.min(targetOffset, targetNode.textContent?.length || 0));
+                    range.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                } else {
+                    // 如果找不到精确位置，移到末尾
+                    this.setCursorToEnd(inputEl);
+                }
+            } catch (e) {
+                // 如果恢复失败，移到末尾
+                this.setCursorToEnd(inputEl);
+            }
+        }
+    }
+
+    // 在光标位置插入文本
+    private insertTextAtCursor(inputEl: HTMLElement, text: string): void {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            const textNode = document.createTextNode(text);
+            range.insertNode(textNode);
+            range.setStartAfter(textNode);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        } else {
+            // 如果没有选择，追加到末尾
+            const textNode = document.createTextNode(text);
+            inputEl.appendChild(textNode);
+            this.setCursorToEnd(inputEl);
+        }
+    }
+
+    // 获取光标前的文本位置（用于替换触发时的单个 "["）
+    private getTextPositionBeforeCursor(inputEl: HTMLElement): number {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            const preRange = range.cloneRange();
+            preRange.selectNodeContents(inputEl);
+            preRange.setEnd(range.startContainer, range.startOffset);
+            return preRange.toString().length;
+        }
+        return this.getTextFromContentEditable(inputEl).length;
+    }
+
+    // 设置光标到输入框末尾
+    private setCursorToEnd(inputEl: HTMLElement): void {
+        const selection = window.getSelection();
+        if (selection) {
+            const range = document.createRange();
+            range.selectNodeContents(inputEl);
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
     }
 
     /**

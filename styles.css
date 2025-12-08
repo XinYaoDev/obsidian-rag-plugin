@@ -289,6 +289,32 @@
     font-size: inherit;
     line-height: 1.5;
     overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* ContentEditable 输入框的 placeholder 效果 */
+.chat-input:empty:before {
+    content: attr(data-placeholder);
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+/* 输入框内的内部链接样式 */
+.chat-input a.internal-link {
+    color: var(--interactive-accent);
+    text-decoration: none;
+    border-bottom: 1px solid var(--interactive-accent);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.chat-input a.internal-link:hover {
+    color: var(--interactive-accent-hover);
+    border-bottom-color: var(--interactive-accent-hover);
+    background-color: var(--background-modifier-hover);
+    padding: 0 2px;
+    border-radius: 3px;
 }
 
 /* 发送按钮 */
