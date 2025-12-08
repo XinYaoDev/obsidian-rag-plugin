@@ -339,7 +339,9 @@ export class SessionManager {
     }
 
     getAllSessions(): SessionMetadata[] {
-        return this.sessionsIndex?.sessions || [];
+        const sessions = this.sessionsIndex?.sessions || [];
+        // 显示时按更新时间倒序排列，最新的会话在最上方
+        return [...sessions].sort((a, b) => b.updatedAt - a.updatedAt);
     }
 
     // ==================== 数据迁移 ====================
