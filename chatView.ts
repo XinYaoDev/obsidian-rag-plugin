@@ -276,9 +276,38 @@ export class ChatView extends ItemView {
             }, 100); // 防抖，避免频繁渲染
         };
 
-        inputEl.addEventListener('input', renderNoteLinks);
+        // 检查是否触发提示词选择器（空格 + @）
+        inputEl.addEventListener('input', (e: InputEvent) => {
+            // 延迟检查，确保输入已完成
+            setTimeout(() => {
+                const currentText = this.getTextFromContentEditable(inputEl);
+                const textBefore = this.getTextBeforeCursor(inputEl);
+                
+                // 检查光标前是否以 " @" 结尾（空格 + @）
+                if (textBefore.endsWith(' @')) {
+                    // 删除刚输入的 @
+                    const selection = window.getSelection();
+                    if (selection && selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        if (range.startOffset > 0) {
+                            range.setStart(range.startContainer, range.startOffset - 1);
+                            range.deleteContents();
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                        }
+                    }
+                    this.openPromptPicker(inputEl);
+                    return;
+                }
+                
+                renderNoteLinks();
+            }, 0);
+        });
+        
         inputEl.addEventListener('paste', () => {
-            setTimeout(renderNoteLinks, 10); // 粘贴后延迟渲染
+            setTimeout(() => {
+                renderNoteLinks();
+            }, 10); // 粘贴后延迟渲染
         });
 
         // 添加 Ctrl+点击跳转功能
@@ -307,21 +336,7 @@ export class ChatView extends ItemView {
                 return;
             }
 
-            // 1.5 监听“空格 + @”触发提示词选择
-            if (e.key === '@') {
-                const selection = window.getSelection();
-                const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
-                if (range) {
-                    const textBefore = range.startContainer.textContent || '';
-                    const offset = range.startOffset;
-                    const prevChar = offset > 0 ? textBefore.charAt(offset - 1) : '';
-                    if (prevChar === ' ') {
-                        e.preventDefault();
-                        this.openPromptPicker(inputEl);
-                        return;
-                    }
-                }
-            }
+            // 1.5 监听“空格 + @”触发提示词选择（已在 input 事件中处理）
 
             // 1.6 监听 "[[" 触发文档引用选择（按更新时间倒序，最多5条）
             if (e.key === '[') {
@@ -367,11 +382,15 @@ export class ChatView extends ItemView {
                 }
             }
 
-            // 3. 如果只按了 Enter (没有按 Shift)
+            // 3. 如果只按了 Enter (没有按 Shift) - 发送消息
+            // Shift + Enter 允许默认行为（换行）
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
+                e.stopPropagation();
                 sendMessage();
+                return;
             }
+            // Shift + Enter 时不阻止默认行为，允许换行
         });
 
         const sendBtn = inputRowContainer.createEl('button', {
@@ -2092,17 +2111,22 @@ export class ChatView extends ItemView {
         }
     }
 
-    // 获取光标前的文本位置（用于替换触发时的单个 "["）
-    private getTextPositionBeforeCursor(inputEl: HTMLElement): number {
+    // 获取光标前的文本内容（纯文本，不包括 HTML）
+    private getTextBeforeCursor(inputEl: HTMLElement): string {
         const selection = window.getSelection();
         if (selection && selection.rangeCount > 0) {
             const range = selection.getRangeAt(0);
             const preRange = range.cloneRange();
             preRange.selectNodeContents(inputEl);
             preRange.setEnd(range.startContainer, range.startOffset);
-            return preRange.toString().length;
+            return preRange.toString();
         }
-        return this.getTextFromContentEditable(inputEl).length;
+        return '';
+    }
+
+    // 获取光标前的文本位置（用于替换触发时的单个 "["）
+    private getTextPositionBeforeCursor(inputEl: HTMLElement): number {
+        return this.getTextBeforeCursor(inputEl).length;
     }
 
     // 设置光标到输入框末尾
