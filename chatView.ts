@@ -1983,6 +1983,126 @@ export class ChatView extends ItemView {
                 }, 2000);
             }
         });
+
+        // 覆盖当前笔记按钮（导出整段对话）
+        const exportBtn = msgBubble.createEl('button', {
+            cls: 'message-export-session-btn',
+            attr: { 'aria-label': '导出会话到当前笔记' }
+        });
+        const exportIcon = exportBtn.createEl('span', { cls: 'copy-btn-icon' });
+        setIcon(exportIcon, 'file-pen');
+        const exportText = exportBtn.createEl('span', {
+            cls: 'copy-btn-text',
+            text: ''
+        });
+
+        exportBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (exportBtn.hasClass('busy')) return;
+
+            exportBtn.addClass('busy');
+            try {
+                const success = await this.exportSessionToActiveNote();
+                if (success) {
+                    exportBtn.addClass('copy-btn--success');
+                    exportIcon.empty();
+                    setIcon(exportIcon, 'check');
+                    exportText.setText('已导出');
+                    setTimeout(() => {
+                        exportBtn.removeClass('copy-btn--success');
+                        exportIcon.empty();
+                        setIcon(exportIcon, 'file-pen');
+                        exportText.setText('');
+                    }, 2000);
+                }
+            } finally {
+                exportBtn.removeClass('busy');
+            }
+        });
+    }
+
+    // 将当前会话内容导出到当前笔记；若无打开笔记则创建新笔记
+    private async exportSessionToActiveNote(): Promise<boolean> {
+        const messages = this.sessionManager.getMessages();
+        if (!messages.length) {
+            new Notice('当前会话为空，无法导出');
+            return false;
+        }
+
+        const content = this.buildSessionExportContent(messages);
+
+        // 获取当前文件
+        let targetFile = this.app.workspace.getActiveFile();
+        let createdNew = false;
+
+        if (!targetFile) {
+            // 无活动文件：在根目录创建新笔记
+            targetFile = await this.createNewSessionNote(content);
+            createdNew = true;
+        } else {
+            await this.app.vault.modify(targetFile, content);
+        }
+
+        // 打开新建的文件
+        if (createdNew && targetFile) {
+            await this.app.workspace.openLinkText(targetFile.path, '');
+        }
+
+        new Notice(createdNew ? '已创建新笔记并导出会话' : '已覆盖当前笔记为会话内容');
+        return true;
+    }
+
+    // 生成会话导出内容
+    private buildSessionExportContent(messages: SessionMessage[]): string {
+        const lines: string[] = [];
+        const now = new Date();
+        lines.push(`# 会话导出 (${now.toLocaleString()})`);
+        lines.push('');
+
+        messages.forEach((msg, idx) => {
+            const roleLabel = msg.role === 'user' ? '用户' : 'AI';
+            lines.push(`## ${idx + 1}. ${roleLabel}`);
+            lines.push('');
+            lines.push(msg.content.trim());
+            if (msg.role === 'assistant' && msg.thinking) {
+                lines.push('');
+                lines.push('> 思考过程');
+                lines.push('');
+                lines.push(msg.thinking.trim());
+            }
+            lines.push('');
+        });
+
+        return lines.join('\n');
+    }
+
+    // 在根目录创建唯一的会话导出笔记
+    private async createNewSessionNote(content: string): Promise<TFile> {
+        const root = this.app.vault.getRoot();
+        const baseName = `Aki 会话导出 ${this.formatDateForFilename(new Date())}`;
+        let attempt = 0;
+        let filePath = '';
+
+        while (true) {
+            const suffix = attempt === 0 ? '' : ` ${attempt}`;
+            const fileName = `${baseName}${suffix}.md`;
+            filePath = normalizePath(`${root.path ? root.path + '/' : ''}${fileName}`);
+            const existing = this.app.vault.getAbstractFileByPath(filePath);
+            if (!existing) break;
+            attempt++;
+        }
+
+        return await this.app.vault.create(filePath, content);
+    }
+
+    private formatDateForFilename(date: Date): string {
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        const yyyy = date.getFullYear();
+        const mm = pad(date.getMonth() + 1);
+        const dd = pad(date.getDate());
+        const hh = pad(date.getHours());
+        const mi = pad(date.getMinutes());
+        return `${yyyy}-${mm}-${dd} ${hh}-${mi}`;
     }
 
     // 复制内容到剪贴板
