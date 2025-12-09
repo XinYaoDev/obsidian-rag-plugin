@@ -39,6 +39,9 @@ export interface RagSettings {
 	titleGenerationProvider: string; // 标题生成服务商
 	titleGenerationModelName: string; // 标题生成模型名称
 	titleGenerationApiKey: string; // 标题生成 API Key
+
+	// --- 提示词使用记录（按最近使用排序） ---
+	promptUsage: Record<string, number>; // key: file.path, value: timestamp
 }
 
 export const DEFAULT_SETTINGS: RagSettings = {
@@ -61,4 +64,7 @@ export const DEFAULT_SETTINGS: RagSettings = {
 	titleGenerationProvider: "deepseek",
 	titleGenerationModelName: "deepseek-chat",
 	titleGenerationApiKey: "",
+
+	// 提示词使用记录
+	promptUsage: {},
 };

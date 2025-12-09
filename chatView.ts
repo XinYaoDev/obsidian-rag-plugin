@@ -931,7 +931,8 @@ export class ChatView extends ItemView {
             return;
         }
 
-        const modal = new PromptSuggestionModal(this.app, promptFiles, async (file) => {
+        const usageMap = this.plugin.settings.promptUsage || {};
+        const modal = new PromptSuggestionModal(this.app, promptFiles, usageMap, async (file) => {
             await this.insertPromptContent(inputEl, file);
         });
         modal.open();
@@ -1066,10 +1067,22 @@ export class ChatView extends ItemView {
 
             // 延迟渲染，确保文本已插入后转为可点击的内部链接
             setTimeout(() => this.renderNoteLinksInInput(inputEl), 10);
+
+            // 记录使用时间用于排序
+            this.recordPromptUsage(file);
         } catch (e) {
             console.error('读取提示词文件失败:', e);
             new Notice('读取提示词失败');
         }
+    }
+
+    // 记录提示词使用时间
+    private recordPromptUsage(file: TFile) {
+        const usageMap = this.plugin.settings.promptUsage || {};
+        usageMap[file.path.toLowerCase()] = Date.now();
+        this.plugin.settings.promptUsage = usageMap;
+        // 异步保存，不阻塞输入体验
+        this.plugin.saveSettings();
     }
 
     // 清洗提示词内容：移除最前面的 frontmatter（--- 包裹）并去除首尾空白
@@ -2373,20 +2386,30 @@ AI回答：${aiAnswer.substring(0, 200)}${aiAnswer.length > 200 ? '...' : ''}
 // 提示词选择弹窗：列出 prompts 目录下的 md 文件
 class PromptSuggestionModal extends SuggestModal<TFile> {
     private promptFiles: TFile[];
+    private usageMap: Record<string, number>;
     private onChooseCallback: (file: TFile) => void;
 
-    constructor(app: App, promptFiles: TFile[], onChoose: (file: TFile) => void) {
+    constructor(app: App, promptFiles: TFile[], usageMap: Record<string, number>, onChoose: (file: TFile) => void) {
         super(app);
         this.promptFiles = promptFiles;
+        this.usageMap = usageMap;
         this.onChooseCallback = onChoose;
         this.setPlaceholder('选择提示词文件');
     }
 
     getSuggestions(query: string): TFile[] {
         const lowerQuery = query.toLowerCase();
-        return this.promptFiles
-            .filter(file => file.basename.toLowerCase().includes(lowerQuery))
-            .sort((a, b) => a.basename.localeCompare(b.basename));
+        const filtered = this.promptFiles.filter(file => file.basename.toLowerCase().includes(lowerQuery));
+
+        // 按最近使用时间排序，未使用过的排在后面；同时间按名称排序
+        return filtered.sort((a, b) => {
+            const keyA = a.path.toLowerCase();
+            const keyB = b.path.toLowerCase();
+            const tsA = this.usageMap?.[keyA] ?? 0;
+            const tsB = this.usageMap?.[keyB] ?? 0;
+            if (tsA !== tsB) return tsB - tsA; // 最近使用的在前
+            return a.basename.localeCompare(b.basename);
+        });
     }
 
     renderSuggestion(file: TFile, el: HTMLElement) {
