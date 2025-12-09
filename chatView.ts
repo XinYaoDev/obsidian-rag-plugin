@@ -1937,8 +1937,14 @@ export class ChatView extends ItemView {
 
     // 添加全文复制按钮
     private addFullCopyButton(msgBubble: HTMLElement, text: string) {
-        const copyBtn = msgBubble.createEl('button', {
-            cls: 'message-copy-full-btn',
+        // 操作按钮容器（右下角悬浮）
+        let actions = msgBubble.querySelector('.message-actions') as HTMLElement | null;
+        if (!actions) {
+            actions = msgBubble.createEl('div', { cls: 'message-actions' });
+        }
+
+        const copyBtn = actions.createEl('button', {
+            cls: 'message-action-btn message-copy-full-btn',
             attr: { 'aria-label': '复制消息' }
         });
 
@@ -1985,8 +1991,8 @@ export class ChatView extends ItemView {
         });
 
         // 覆盖当前笔记按钮（导出整段对话）
-        const exportBtn = msgBubble.createEl('button', {
-            cls: 'message-export-session-btn',
+        const exportBtn = actions.createEl('button', {
+            cls: 'message-action-btn message-export-session-btn',
             attr: { 'aria-label': '导出会话到当前笔记' }
         });
         const exportIcon = exportBtn.createEl('span', { cls: 'copy-btn-icon' });

@@ -206,8 +206,8 @@
     border: 1px solid var(--background-modifier-border);
     color: var(--text-normal);
     border-bottom-left-radius: 4px;
-    /* 为全文复制按钮预留空间 */
-    padding-bottom: 48px;
+    /* 为底部操作按钮预留空间 */
+    padding-bottom: 64px;
 }
 
 /* 错误消息样式 */
@@ -1005,47 +1005,65 @@
 }
 
 /* =========================================
-   全文复制按钮样式
+   AI 消息底部操作区（复制 / 导出）
 ========================================= */
-
-/* 全文复制按钮容器 */
-.message-copy-full-btn {
+.message-actions {
     position: absolute;
-    bottom: 8px;
-    left: 8px;
-    display: flex;
+    right: 10px;
+    bottom: 10px;
+    display: inline-flex;
+    gap: 8px;
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.theme-dark .message-actions {
+    background: transparent;
+}
+
+.chat-message-bubble.ai:hover .message-actions {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.message-action-btn {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
     padding: 6px 10px;
-    border-radius: 6px;
+    border-radius: 8px;
     background-color: var(--background-secondary);
     border: 1px solid var(--background-modifier-border);
     cursor: pointer;
-    opacity: 0.4;
-    transition: all 0.2s ease;
     font-size: 0.85em;
     color: var(--text-muted);
     user-select: none;
-    /* 强制垂直居中 */
     line-height: 1;
     height: auto;
+    transition: all 0.2s ease;
 }
 
-/* 悬停状态 */
-.chat-message-bubble.ai:hover .message-copy-full-btn {
-    opacity: 1;
-}
-
-.message-copy-full-btn:hover {
+.message-action-btn:hover {
     background-color: var(--background-modifier-hover);
     color: var(--text-normal);
 }
 
-/* 成功状态 */
-.message-copy-full-btn.copy-btn--success {
+.message-action-btn.copy-btn--success {
     color: var(--interactive-accent);
     border-color: var(--interactive-accent);
+    background-color: var(--background-modifier-success-hover);
+}
+
+.message-action-btn.busy {
+    cursor: wait;
+    opacity: 0.7;
 }
 
 /* 按钮图标 */
