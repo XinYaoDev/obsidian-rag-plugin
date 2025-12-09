@@ -575,11 +575,18 @@ export class SessionManager {
             await this.ensureDirectory(sessionPath);
             await this.app.vault.create(sessionPath, content);
 
-            // 添加到索引
+            // 添加到索引，确保非空
             if (!this.sessionsIndex) {
                 await this.loadOrCreateIndex();
             }
-            
+            if (!this.sessionsIndex) {
+                this.sessionsIndex = {
+                    version: '1.0',
+                    currentSessionId: session.sessionId,
+                    sessions: []
+                };
+            }
+
             this.sessionsIndex.sessions.push({
                 sessionId: session.sessionId,
                 sessionName: session.sessionName,

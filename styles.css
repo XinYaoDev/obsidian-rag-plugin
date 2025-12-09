@@ -2,12 +2,100 @@
    主容器布局：Flex 列布局，占满全高
 ========================================= */
 .rag-chat-container {
+    /* RAG 视图专用调色板（浅色） */
+    --rag-surface: #F6F7FB;
+    --rag-card: #FFFFFF;
+    --rag-secondary: #EEF2FF;
+    --rag-primary: #4A6BFF;
+    --rag-primary-hover: #6380FF;
+    --rag-border: #E3E6EF;
+    --rag-border-strong: #D5DBEA;
+    --rag-muted: #5C6373;
+    --rag-text: #1F2430;
+    --rag-accent-rgb: 74, 107, 255;
+    --rag-success: #35C27A;
+    --rag-success-subtle: #E7F6EF;
+    --rag-success-hover: #D3F0E0;
+    --rag-error: #F35B5B;
+    --rag-error-subtle: #FFE9E9;
+    --rag-error-hover: #FFE1E1;
+
+    /* 将 Obsidian 变量映射为本视图的专属色板，局部生效 */
+    --background-primary: var(--rag-surface);
+    --background-primary-alt: #E9F0FF;
+    --background-secondary: var(--rag-card);
+    --background-secondary-alt: var(--rag-secondary);
+    --background-modifier-border: var(--rag-border);
+    --background-modifier-border-hover: var(--rag-border-strong);
+    --background-modifier-border-focus: rgba(var(--rag-accent-rgb), 0.18);
+    --background-modifier-hover: var(--rag-secondary);
+    --background-modifier-success: var(--rag-success-subtle);
+    --background-modifier-success-hover: var(--rag-success-hover);
+    --background-modifier-error: var(--rag-error);
+    --background-modifier-error-subtle: var(--rag-error-subtle);
+    --background-modifier-error-hover: var(--rag-error-hover);
+    --interactive-accent: var(--rag-primary);
+    --interactive-accent-hover: var(--rag-primary-hover);
+    --interactive-accent-rgb: var(--rag-accent-rgb);
+    --text-normal: var(--rag-text);
+    --text-muted: var(--rag-muted);
+    --text-accent: var(--rag-primary);
+    --text-on-accent: #FFFFFF;
+    --text-error: var(--rag-error);
+    --text-success: var(--rag-success);
+
     display: flex;
     flex-direction: column;
     height: 100%;   
     overflow: hidden; /* 隐藏溢出，交给子元素滚动 */
     background-color: var(--background-primary);
     padding: 0 !important; /* 覆盖原来可能有的 padding */
+    font-family: "Inter", "SF Pro Text", "SF Pro Display", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* 深色主题适配 */
+.theme-dark .rag-chat-container {
+    --rag-surface: #0F1117;
+    --rag-card: #151925;
+    --rag-secondary: #1E2433;
+    --rag-primary: #6E8CFF;
+    --rag-primary-hover: #8CA4FF;
+    --rag-border: #252C3A;
+    --rag-border-strong: #2F384A;
+    --rag-muted: #A8B2C7;
+    --rag-text: #E8ECF5;
+    --rag-accent-rgb: 110, 140, 255;
+    --rag-success: #4CD89D;
+    --rag-success-subtle: #1F3A2F;
+    --rag-success-hover: #214737;
+    --rag-error: #F88484;
+    --rag-error-subtle: #2B1A1A;
+    --rag-error-hover: #3A1F1F;
+
+    --background-primary: var(--rag-surface);
+    --background-primary-alt: #1A1F2C;
+    --background-secondary: var(--rag-card);
+    --background-secondary-alt: var(--rag-secondary);
+    --background-modifier-border: var(--rag-border);
+    --background-modifier-border-hover: var(--rag-border-strong);
+    --background-modifier-border-focus: rgba(var(--rag-accent-rgb), 0.32);
+    --background-modifier-hover: var(--rag-secondary);
+    --background-modifier-success: var(--rag-success-subtle);
+    --background-modifier-success-hover: var(--rag-success-hover);
+    --background-modifier-error: var(--rag-error);
+    --background-modifier-error-subtle: var(--rag-error-subtle);
+    --background-modifier-error-hover: var(--rag-error-hover);
+    --interactive-accent: var(--rag-primary);
+    --interactive-accent-hover: var(--rag-primary-hover);
+    --interactive-accent-rgb: var(--rag-accent-rgb);
+    --text-normal: var(--rag-text);
+    --text-muted: var(--rag-muted);
+    --text-accent: var(--rag-primary);
+    --text-on-accent: #0F1117;
+    --text-error: var(--rag-error);
+    --text-success: var(--rag-success);
 }
 
 /* =========================================
@@ -99,8 +187,9 @@
 
 /* 用户气泡颜色 */
 .chat-message-bubble.user {
-    background-color: var(--interactive-accent);
-    color: var(--text-on-accent);
+    background: linear-gradient(135deg, #EFF3FF, #E6EDFF);
+    color: var(--rag-text);
+    border: 1px solid var(--rag-border);
     border-bottom-right-radius: 4px;
 }
 
@@ -325,7 +414,7 @@
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background-color: var(--interactive-accent);
+    background: linear-gradient(135deg, var(--interactive-accent), #7FA1FF);
     color: var(--text-on-accent);
     border: none;
     cursor: pointer;
@@ -334,7 +423,7 @@
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 .chat-send-btn:hover {
-    background-color: var(--interactive-accent-hover);
+    background: linear-gradient(135deg, var(--interactive-accent-hover), #96B1FF);
 }
 .chat-send-btn:active {
     transform: scale(0.95);
@@ -346,18 +435,22 @@
 
 /* 终止按钮样式 */
 .chat-send-btn.stop-btn {
-    background-color: var(--interactive-accent);
+    background: var(--interactive-accent);
     color: var(--text-on-accent);
+    transition: background-color 0.2s ease, transform 0.1s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* 终止按钮悬停时变成红色警示 */
-.chat-send-btn.stop-btn:hover {
-    background-color: #dc3545 !important; /* 红色警示色 */
-    color: white;
+/* 终止按钮悬停/聚焦时变成红色警示 */
+.chat-send-btn.stop-btn:hover,
+.chat-send-btn.stop-btn:focus-visible {
+    background: #dc3545 !important; /* 红色警示色 */
+    color: #fff !important;
+    box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.18);
 }
 
 .chat-send-btn.stop-btn:active {
-    background-color: #c82333 !important; /* 更深的红色 */
+    background: #c82333 !important; /* 更深的红色 */
+    color: #fff !important;
     transform: scale(0.95);
 }
 
@@ -401,6 +494,9 @@
     background-color: var(--background-primary-alt);
     border: 1px solid var(--background-modifier-border);
     border-radius: 4px;
+    font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.92em;
+    line-height: 1.55;
 }
 
 /* 5. 标题紧凑化 */
@@ -1046,6 +1142,9 @@
     margin: 0;
     border-radius: 0;
     border: none;
+    font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.92em;
+    line-height: 1.55;
 }
 
 /* =========================================
