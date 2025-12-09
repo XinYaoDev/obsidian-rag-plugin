@@ -20,7 +20,7 @@ export default class RagPlugin extends Plugin {
         // 添加设置面板
         this.addSettingTab(new RagSettingTab(this.app, this));
 
-        console.log('RAG 插件已加载 - 开始监听文件变化');
+        console.log('Aki 已加载 - 开始监听文件变化');
 
         // ============================================================
         // ✅ 新增：监听编辑器变化 (这是过滤 Remote Save 的关键)
@@ -41,7 +41,7 @@ export default class RagPlugin extends Plugin {
         );
 
         // 2. 添加左侧 Ribbon 图标
-        this.addRibbonIcon('bot', '打开 RAG 助手', () => {
+        this.addRibbonIcon('bot', '打开 Aki', () => {
             this.activateView();
         });
 
@@ -64,7 +64,7 @@ export default class RagPlugin extends Plugin {
     }
 
     onunload() {
-        console.log('RAG 插件已卸载');
+        console.log('Aki 已卸载');
     }
 
     async loadSettings() {

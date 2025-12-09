@@ -15,7 +15,7 @@ export class RagSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
-        containerEl.createEl('h2', { text: 'RAG 助手配置 (完整版)' });
+        containerEl.createEl('h2', { text: 'Aki 配置 (完整版)' });
 
         // 1. Java 后端
         new Setting(containerEl)

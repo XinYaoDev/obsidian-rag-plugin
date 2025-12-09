@@ -1,9 +1,9 @@
 {
     "id": "obsidian-rag-plugin",
-    "name": "My RAG Assistant Plugin",
+    "name": "Aki",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "我的个人知识库 AI 助手",
+	"description": "Aki：懂你的生活与写作的个人助理",
 	"author": "ALIVE",
 	"authorUrl": "https://github.com/XinYaoDev",
 	"fundingUrl": "https://obsidian.md/pricing",

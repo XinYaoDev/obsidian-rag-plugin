@@ -25,7 +25,7 @@ export class ChatView extends ItemView {
     }
 
     getViewType() { return VIEW_TYPE_CHAT; }
-    getDisplayText() { return "RAG 助手"; }
+    getDisplayText() { return "Aki"; }
     getIcon() { return "bot"; }
 
     async onOpen() {
@@ -43,7 +43,8 @@ export class ChatView extends ItemView {
         // 1. 顶部区域：标题 + 会话管理按钮
         // ===========================
         const header = container.createEl('div', { cls: 'chat-header' });
-        header.createEl('h4', { text: '知识库助手' });
+        const titleWrap = header.createEl('div', { cls: 'chat-title' });
+        titleWrap.createEl('h4', { text: 'Aki' });
 
         // 会话管理按钮组
         const sessionActions = header.createEl('div', { cls: 'session-actions' });
