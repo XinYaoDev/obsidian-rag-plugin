@@ -1043,19 +1043,28 @@ export class ChatView extends ItemView {
         );
     }
 
-    // 将提示词内容插入输入框当前位置
+    // 将提示词作为 [[链接]] 插入，避免在输入框展开长文本
     private async insertPromptContent(inputEl: HTMLElement, file: TFile) {
         try {
+            // 仍然读取内容做空内容校验，但不在输入框展开
             const raw = await this.app.vault.read(file);
             const content = this.cleanPromptContent(raw);
-
             if (!content) {
                 new Notice('提示词内容为空');
                 return;
             }
 
-            this.insertTextAtCursor(inputEl, content);
-            // 延迟渲染，确保文本已插入
+            // 使用提示词文件名构造内部链接（与笔记一致，便于 Ctrl+点击跳转）
+            const linkText = `[[${file.basename}]]`;
+
+            // 如果光标前不是空格，为了阅读性自动补一个空格
+            const textBefore = this.getTextBeforeCursor(inputEl);
+            const needsLeadingSpace = textBefore.endsWith(' ') || textBefore.length === 0 ? '' : ' ';
+
+            // 在光标处插入链接，并在末尾补一个空格便于继续输入
+            this.insertTextAtCursor(inputEl, `${needsLeadingSpace}${linkText} `);
+
+            // 延迟渲染，确保文本已插入后转为可点击的内部链接
             setTimeout(() => this.renderNoteLinksInInput(inputEl), 10);
         } catch (e) {
             console.error('读取提示词文件失败:', e);
