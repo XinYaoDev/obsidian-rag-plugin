@@ -193,6 +193,13 @@
     border-bottom-right-radius: 4px;
 }
 
+/* 深色模式下的用户气泡：提高对比度与文字可读性 */
+.theme-dark .chat-message-bubble.user {
+    background: linear-gradient(135deg, #24304a, #1c263a);
+    color: #E8ECF5;
+    border: 1px solid #2F384A;
+}
+
 /* AI 气泡颜色 */
 .chat-message-bubble.ai {
     background-color: var(--background-secondary-alt);
@@ -246,6 +253,8 @@
     flex-direction: column; /* 修改为列布局以容纳开关 */
     gap: 12px;
     flex-shrink: 0;
+    /* 避开右下角悬浮状态窗的遮挡 */
+    margin-bottom: 20px;
 }
 
 /* 深度思考开关容器 */
