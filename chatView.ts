@@ -18,6 +18,11 @@ export class ChatView extends ItemView {
     private inputHistoryIndex: number = -1; // -1 表示在最新位置
     private readonly MAX_HISTORY_SIZE = 50; // 最多保存50条历史记录
 
+    // 滚动控制：是否自动跟随流式内容滚动
+    private autoScrollEnabled = true;
+    // 标记当前是否正在流式生成回答
+    private isStreaming = false;
+
     constructor(leaf: WorkspaceLeaf, plugin: RagPlugin) {
         super(leaf);
         this.plugin = plugin;
@@ -81,6 +86,15 @@ export class ChatView extends ItemView {
         // 2. 消息区域（先创建，供后续事件处理使用）
         // ===========================
         const messageHistory = container.createEl('div', { cls: 'chat-messages' });
+
+        // 用户在流式生成时滚动，则暂停自动滚动，交由用户控制
+        const stopAutoScrollOnUserScroll = () => {
+            if (!this.isStreaming) return;
+            this.autoScrollEnabled = false;
+        };
+        messageHistory.addEventListener('wheel', stopAutoScrollOnUserScroll, { passive: true });
+        messageHistory.addEventListener('touchmove', stopAutoScrollOnUserScroll, { passive: true });
+        messageHistory.addEventListener('mousedown', stopAutoScrollOnUserScroll);
 
         // ===========================
         // 会话下拉菜单
@@ -407,7 +421,7 @@ export class ChatView extends ItemView {
             const thinking = msg.role === 'assistant' ? (msg.thinking || null) : null;
             await this.appendMessage(messageHistory, msg.content, displayType, false, false, thinking);
         }
-        messageHistory.scrollTo({ top: messageHistory.scrollHeight });
+        this.scrollToBottomIfAllowed(messageHistory, 'auto');
 
         // ============================================================
         // 4. 发送逻辑 - 流式响应版本
@@ -422,6 +436,10 @@ export class ChatView extends ItemView {
             const rawInput = this.getTextFromContentEditable(inputEl);
             const content = rawInput.trim();
             if (!content) return;
+
+            // 新一轮提问开始时恢复自动滚动
+            this.autoScrollEnabled = true;
+            this.isStreaming = true;
 
             // 展开 [[note]] 链接为笔记内容（仅发送/上下文使用，不在输入框显示）
             const expandedQuestion = (await this.expandNoteLinks(content)).trim();
@@ -471,7 +489,6 @@ export class ChatView extends ItemView {
             let thinkingHeader: HTMLElement | null = null;
             let thinkingIconContainer: HTMLElement | null = null;
             let answerContainer: HTMLElement | null = null;
-            let isStreaming = true;
             let hasStartedAnswering = false; // 标记是否已开始回答
 
             // 渲染节流控制
@@ -519,7 +536,7 @@ export class ChatView extends ItemView {
 
             // 渲染函数（带节流）
             const renderAnswer = () => {
-                if (!answerContainer || !isStreaming) return;
+                if (!answerContainer || !this.isStreaming) return;
 
                 // 清空容器
                 answerContainer.empty();
@@ -548,7 +565,7 @@ export class ChatView extends ItemView {
                 }
 
                 // 滚动到底部
-                messageHistory.scrollTo({ top: messageHistory.scrollHeight, behavior: 'smooth' });
+                this.scrollToBottomIfAllowed(messageHistory, 'smooth');
             };
 
             // 节流渲染函数
@@ -562,7 +579,7 @@ export class ChatView extends ItemView {
 
             // 更新思考内容的函数（使用节流优化）
             const updateThinking = (newData: string) => {
-                if (!thinkingContent || !isStreaming) return;
+                if (!thinkingContent || !this.isStreaming) return;
                 thinkingBuffer += newData;
 
                 // 节流渲染思考内容（减少节流时间以提升更新速度）
@@ -590,7 +607,7 @@ export class ChatView extends ItemView {
 
                     // 只滚动外部的消息历史容器到底部，不操作思考面板内部的滚动
                     // 思考面板在活跃状态下会自然扩展，不会有内部滚动条
-                    messageHistory.scrollTo({ top: messageHistory.scrollHeight, behavior: 'smooth' });
+                    this.scrollToBottomIfAllowed(messageHistory, 'smooth');
 
                     thinkingRenderTimer = null;
                 }, 100); // ⚠️ 优化：思考内容渲染节流从 200ms 减少到 100ms，提升更新速度
@@ -615,7 +632,7 @@ export class ChatView extends ItemView {
                 }
 
                 // 停止流式更新
-                isStreaming = false;
+                this.isStreaming = false;
                 if (renderTimer) {
                     clearTimeout(renderTimer);
                     renderTimer = null;
@@ -698,12 +715,12 @@ export class ChatView extends ItemView {
                     currentAbortController, // 传递 AbortController
                     // onThinking 回调
                     (thinkingData: string) => {
-                        if (!isStreaming) return; // 如果已终止，不再处理
+                        if (!this.isStreaming) return; // 如果已终止，不再处理
                         updateThinking(thinkingData);
                     },
                     // onAnswer 回调
                     (answerData: string) => {
-                        if (!isStreaming) return; // 如果已终止，不再处理
+                        if (!this.isStreaming) return; // 如果已终止，不再处理
                         // 第一次收到回答数据时，自动折叠思考面板
                         if (!hasStartedAnswering && thinkingPanel && thinkingContent && thinkingIconContainer) {
                             hasStartedAnswering = true;
@@ -723,7 +740,7 @@ export class ChatView extends ItemView {
                     },
                     // onError 回调
                     async (error: Error) => {
-                        isStreaming = false;
+                        this.isStreaming = false;
                         currentAbortController = null; // 清空 AbortController
                         
                         if (renderTimer) {
@@ -762,7 +779,7 @@ export class ChatView extends ItemView {
                     },
                     // onComplete 回调
                     async () => {
-                        isStreaming = false;
+                        this.isStreaming = false;
                         currentAbortController = null; // 清空 AbortController
 
                         // 清除所有节流定时器
@@ -841,7 +858,7 @@ export class ChatView extends ItemView {
 
             } catch (e: any) {
                 // 连接失败 - 执行撤回
-                isStreaming = false;
+                this.isStreaming = false;
                 currentAbortController = null; // 清空 AbortController
                 
                 // 如果是用户主动终止，不显示错误消息
@@ -899,7 +916,7 @@ export class ChatView extends ItemView {
 
             // 更新会话名称显示(如果需要可以添加)
 
-            messageHistory.scrollTo({ top: messageHistory.scrollHeight });
+            this.scrollToBottomIfAllowed(messageHistory, 'auto');
         } catch (e) {
             console.error('切换会话失败:', e);
             new Notice('切换会话失败');
@@ -1110,7 +1127,7 @@ export class ChatView extends ItemView {
                 }
 
                 // 更新会话名称显示(如果需要可以添加)
-                messageHistory.scrollTo({ top: messageHistory.scrollHeight });
+                this.scrollToBottomIfAllowed(messageHistory, 'auto');
             }
         } catch (e) {
             console.error('删除会话失败:', e);
@@ -1550,6 +1567,14 @@ export class ChatView extends ItemView {
     }
 
     // ============================================================
+    // 滚动辅助：在自动滚动开启时才滚动到底部
+    // ============================================================
+    private scrollToBottomIfAllowed(target: HTMLElement, behavior: ScrollBehavior = 'smooth') {
+        if (!this.autoScrollEnabled) return;
+        target.scrollTo({ top: target.scrollHeight, behavior });
+    }
+
+    // ============================================================
     // 失败撤回方法
     // ============================================================
     private async rollbackFailedMessage(inputEl: HTMLElement) {
@@ -1630,7 +1655,7 @@ export class ChatView extends ItemView {
             }
         }
 
-        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+        this.scrollToBottomIfAllowed(container, 'smooth');
         return msgWrapper;
     }
 
@@ -2036,6 +2061,10 @@ export class ChatView extends ItemView {
         }
 
         const content = this.buildSessionExportContent(messages);
+        if (!content.trim()) {
+            new Notice('当前会话没有可导出的 AI 回复');
+            return false;
+        }
 
         // 获取当前文件
         let targetFile = this.app.workspace.getActiveFile();
@@ -2058,28 +2087,19 @@ export class ChatView extends ItemView {
         return true;
     }
 
-    // 生成会话导出内容
+    // 生成会话导出内容（仅导出最新一条 AI 回复正文）
     private buildSessionExportContent(messages: SessionMessage[]): string {
-        const lines: string[] = [];
-        const now = new Date();
-        lines.push(`# 会话导出 (${now.toLocaleString()})`);
-        lines.push('');
-
-        messages.forEach((msg, idx) => {
-            const roleLabel = msg.role === 'user' ? '用户' : 'AI';
-            lines.push(`## ${idx + 1}. ${roleLabel}`);
-            lines.push('');
-            lines.push(msg.content.trim());
-            if (msg.role === 'assistant' && msg.thinking) {
-                lines.push('');
-                lines.push('> 思考过程');
-                lines.push('');
-                lines.push(msg.thinking.trim());
+        // 找到最后一条有内容的 AI 消息
+        for (let i = messages.length - 1; i >= 0; i--) {
+            const msg = messages[i];
+            if (msg.role === 'assistant') {
+                const answer = msg.content?.trim();
+                if (answer) {
+                    return answer;
+                }
             }
-            lines.push('');
-        });
-
-        return lines.join('\n');
+        }
+        return '';
     }
 
     // 在根目录创建唯一的会话导出笔记
