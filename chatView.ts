@@ -1,4 +1,4 @@
-import { App, ItemView, WorkspaceLeaf, setIcon, Notice, MarkdownRenderer, TFile, normalizePath, SuggestModal } from 'obsidian';
+import { App, ItemView, WorkspaceLeaf, setIcon, Notice, MarkdownRenderer, TFile, normalizePath, SuggestModal, Modal } from 'obsidian';
 import type RagPlugin from './main';
 import { SessionManager, type SessionMessage } from './sessionManager';
 import { RenameModal } from './renameModal';
@@ -271,13 +271,14 @@ export class ChatView extends ItemView {
 
         // ================= LLM 选择器（厂商/模型） =================
         const llmSelectorBtn = toggleContainer.createEl('button', { cls: 'llm-selector-btn' });
+        llmSelectorBtn.style.position = 'relative';
         const getLlmLabel = () => {
             const active = this.getSelectedChatModel();
-            if (active?.provider && active?.model) return `${active.provider}/${active.model}`;
+            if (active?.name || active?.model) return active.name || active.model;
             return '选择模型';
         };
         const refreshLlmLabel = () => {
-            llmSelectorBtn.setText(getLlmLabel());
+            llmSelectorBtn.setText(`${getLlmLabel()} ▼`);
         };
         refreshLlmLabel();
 
@@ -287,29 +288,45 @@ export class ChatView extends ItemView {
             llmDropdown = null;
         };
 
-        const openDropdown = () => {
-            closeDropdown();
-            llmDropdown = toggleContainer.createDiv({ cls: 'llm-selector-dropdown' });
+        let llmDropdownEl: HTMLElement | null = null;
+        const closeLlmDropdown = () => {
+            llmDropdownEl?.remove();
+            llmDropdownEl = null;
+        };
 
-            const models = (this.plugin.settings.chatModels || []).filter(m => m.enabled);
+        const openLlmDropdown = () => {
+            closeLlmDropdown();
+            const active = this.getSelectedChatModel();
+            const models = this.getEnabledChatModels()
+                .filter(m => m.id !== active?.id)
+                .slice(0, 4);
+
+            const rect = llmSelectorBtn.getBoundingClientRect();
+            llmDropdownEl = document.body.createDiv({ cls: 'llm-inline-dropdown llm-float' });
+            llmDropdownEl.style.position = 'fixed';
+            llmDropdownEl.style.left = `${rect.left}px`;
+            llmDropdownEl.style.top = `${rect.top}px`;
+            llmDropdownEl.style.transform = 'translateY(-8px) translateY(-100%)';
+            llmDropdownEl.style.minWidth = `${Math.max(rect.width, 180)}px`;
+
             if (models.length === 0) {
-                llmDropdown.createSpan({ text: '请先在 Model 页添加启用的模型' });
-                return;
+                llmDropdownEl.createSpan({ text: '无其他可用模型，请在 Model 页启用' });
+            } else {
+                models.forEach((m) => {
+                    const item = llmDropdownEl!.createDiv({ cls: 'llm-inline-item' });
+                    item.setText(m.name || m.model || '未命名');
+                    item.addEventListener('click', async () => {
+                        this.plugin.settings.selectedChatModelId = m.id;
+                        await this.plugin.saveSettings();
+                        refreshLlmLabel();
+                        closeLlmDropdown();
+                    });
+                });
             }
 
-            models.forEach((model) => {
-                const item = llmDropdown!.createDiv({ cls: 'llm-selector-item', text: `${model.provider}/${model.model}` });
-                item.addEventListener('click', async () => {
-                    this.plugin.settings.selectedChatModelId = model.id;
-                    await this.plugin.saveSettings();
-                    refreshLlmLabel();
-                    closeDropdown();
-                });
-            });
-
-            const onClickOutside = (e: MouseEvent) => {
-                if (llmDropdown && !llmDropdown.contains(e.target as Node) && e.target !== llmSelectorBtn) {
-                    closeDropdown();
+            const onClickOutside = (ev: MouseEvent) => {
+                if (llmDropdownEl && !llmDropdownEl.contains(ev.target as Node) && ev.target !== llmSelectorBtn) {
+                    closeLlmDropdown();
                     document.removeEventListener('click', onClickOutside);
                 }
             };
@@ -318,10 +335,10 @@ export class ChatView extends ItemView {
 
         llmSelectorBtn.onclick = (e) => {
             e.stopPropagation();
-            if (llmDropdown) {
-                closeDropdown();
+            if (llmDropdownEl) {
+                closeLlmDropdown();
             } else {
-                openDropdown();
+                openLlmDropdown();
             }
         };
 
@@ -1476,11 +1493,15 @@ export class ChatView extends ItemView {
         }
     }
 
+    private getEnabledChatModels() {
+        return (this.plugin.settings.chatModels || []).filter(m => m.enabled);
+    }
+
     // 获取当前选中的 LLM 配置
     private getSelectedChatModel() {
         const settings = this.plugin.settings;
         const models = settings.chatModels || [];
-        const enabled = models.filter(m => m.enabled);
+        const enabled = this.getEnabledChatModels();
         const active = enabled.find(m => m.id === settings.selectedChatModelId)
             || enabled[0]
             || models[0];
@@ -2660,6 +2681,7 @@ class PromptSuggestionModal extends SuggestModal<TFile> {
         this.onChooseCallback(file);
     }
 }
+
 
 // 文档引用选择弹窗：按更新时间倒序，仅展示最多5条，支持模糊匹配
 class NoteSuggestionModal extends SuggestModal<TFile> {

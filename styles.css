@@ -1347,3 +1347,25 @@
     font-size: 14px;
     line-height: 1;
 }
+
+/* Chat 界面模型选择下拉 */
+.llm-inline-dropdown {
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    padding: 8px;
+    min-width: 180px;
+    z-index: 10;
+}
+.llm-inline-dropdown.llm-float {
+    position: fixed;
+}
+.llm-inline-item {
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.llm-inline-item:hover {
+    background: var(--background-modifier-hover);
+}
