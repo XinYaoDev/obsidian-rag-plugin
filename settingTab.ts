@@ -1,7 +1,6 @@
 // SettingTab.ts
 import { App, PluginSettingTab, Setting, Modal } from 'obsidian';
 import type RagPlugin from './main';
-import { EMBEDDING_PROVIDERS } from './settings';
 
 export class RagSettingTab extends PluginSettingTab {
     plugin: RagPlugin;
@@ -44,42 +43,6 @@ export class RagSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.javaBackendUrl)
                 .onChange(async (value) => {
                     this.plugin.settings.javaBackendUrl = value.replace(/\/$/, '');
-                    await this.plugin.saveSettings();
-                }));
-
-        // Embedding 设置
-        containerEl.createEl('h3', { text: '🧠 向量模型 (Embedding) 设置' });
-
-        new Setting(containerEl)
-            .setName('选择服务商')
-            .addDropdown(dropdown => {
-                EMBEDDING_PROVIDERS.forEach(p => dropdown.addOption(p.value, p.text));
-                dropdown.setValue(this.plugin.settings.selectedEmbeddingProvider)
-                    .onChange(async (value) => {
-                        this.plugin.settings.selectedEmbeddingProvider = value;
-                        await this.plugin.saveSettings();
-                    });
-            });
-
-        new Setting(containerEl)
-            .setName('Embedding API Key')
-            .setDesc('向量服务的 API Key')
-            .addText(text => text
-                .setPlaceholder('sk-...')
-                .setValue(this.plugin.settings.embeddingApiKey)
-                .onChange(async (value) => {
-                    this.plugin.settings.embeddingApiKey = value;
-                    await this.plugin.saveSettings();
-                }));
-
-        new Setting(containerEl)
-            .setName('Embedding 模型名称')
-            .setDesc('填入具体模型 ID (如 text-embedding-v1, text-embedding-3-small)')
-            .addText(text => text
-                .setPlaceholder('text-embedding-v1')
-                .setValue(this.plugin.settings.embeddingModelName)
-                .onChange(async (value) => {
-                    this.plugin.settings.embeddingModelName = value;
                     await this.plugin.saveSettings();
                 }));
         
@@ -211,6 +174,80 @@ export class RagSettingTab extends PluginSettingTab {
         };
 
         renderRows();
+
+        // Embedding Models
+        const embedHeader = containerEl.createDiv({ cls: 'model-tab-header' });
+        embedHeader.createEl('h3', { text: '🧠 Embedding Models' });
+        const addEmbedBtn = embedHeader.createEl('button', { text: '+ Add Model', cls: 'model-add-btn' });
+
+        const embedTable = containerEl.createDiv({ cls: 'model-table' });
+        const embedHead = embedTable.createDiv({ cls: 'model-table__head' });
+        embedHead.createDiv({ text: 'Model', cls: 'model-col model-col--name' });
+        embedHead.createDiv({ text: 'Provider', cls: 'model-col model-col--provider' });
+        embedHead.createDiv({ text: 'Enable', cls: 'model-col model-col--enable' });
+        embedHead.createDiv({ text: 'Actions', cls: 'model-col model-col--actions' });
+
+        const embedBody = embedTable.createDiv({ cls: 'model-table__body' });
+
+        const renderEmbedRows = () => {
+            embedBody.empty();
+            this.plugin.settings.embeddingModels.forEach(model => {
+                const row = embedBody.createDiv({ cls: 'model-row' });
+                row.createDiv({ text: model.name || model.model || '未命名', cls: 'model-col model-col--name' });
+                row.createDiv({ text: model.provider || '-', cls: 'model-col model-col--provider' });
+
+                const enableCol = row.createDiv({ cls: 'model-col model-col--enable' });
+                const enableToggle = enableCol.createEl('input', { type: 'checkbox' });
+                enableToggle.checked = model.enabled;
+                enableToggle.onchange = async () => {
+                    model.enabled = enableToggle.checked;
+                    await this.plugin.saveSettings();
+                    this.ensureSelectedEmbeddingModel();
+                    renderEmbedRows();
+                };
+
+                const actions = row.createDiv({ cls: 'model-col model-col--actions' });
+                const editBtn = actions.createEl('button', { cls: 'icon-btn', attr: { 'aria-label': '编辑' } });
+                editBtn.innerHTML = '✏️';
+                editBtn.onclick = () => {
+                    new ModelEditModal(this.app, model, async (updated) => {
+                        Object.assign(model, updated);
+                        await this.plugin.saveSettings();
+                        this.ensureSelectedEmbeddingModel();
+                        renderEmbedRows();
+                    }).open();
+                };
+                const deleteBtn = actions.createEl('button', { cls: 'icon-btn', attr: { 'aria-label': '删除' } });
+                deleteBtn.innerHTML = '🗑️';
+                deleteBtn.onclick = async () => {
+                    const idx = this.plugin.settings.embeddingModels.findIndex(m => m.id === model.id);
+                    if (idx >= 0) {
+                        this.plugin.settings.embeddingModels.splice(idx, 1);
+                        this.ensureSelectedEmbeddingModel();
+                        await this.plugin.saveSettings();
+                        renderEmbedRows();
+                    }
+                };
+            });
+        };
+
+        addEmbedBtn.onclick = async () => {
+            const newModel = {
+                id: `embed-${Date.now()}`,
+                name: 'New Embedding',
+                provider: '',
+                model: '',
+                baseUrl: '',
+                apiKey: '',
+                enabled: true,
+            };
+            this.plugin.settings.embeddingModels.push(newModel);
+            this.ensureSelectedEmbeddingModel();
+            await this.plugin.saveSettings();
+            renderEmbedRows();
+        };
+
+        renderEmbedRows();
     }
 
     private ensureSelectedChatModel() {
@@ -218,6 +255,14 @@ export class RagSettingTab extends PluginSettingTab {
         if (!this.plugin.settings.selectedChatModelId || !enabled.some(m => m.id === this.plugin.settings.selectedChatModelId)) {
             const fallback = enabled[0] || this.plugin.settings.chatModels[0];
             this.plugin.settings.selectedChatModelId = fallback?.id || '';
+        }
+    }
+
+    private ensureSelectedEmbeddingModel() {
+        const enabled = this.plugin.settings.embeddingModels.filter(m => m.enabled);
+        if (!this.plugin.settings.selectedEmbeddingModelId || !enabled.some(m => m.id === this.plugin.settings.selectedEmbeddingModelId)) {
+            const fallback = enabled[0] || this.plugin.settings.embeddingModels[0];
+            this.plugin.settings.selectedEmbeddingModelId = fallback?.id || '';
         }
     }
 }

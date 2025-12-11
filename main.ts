@@ -71,6 +71,15 @@ export default class RagPlugin extends Plugin {
         this.settings = normalizeSettings(Object.assign({}, DEFAULT_SETTINGS, await this.loadData()));
     }
 
+    private getSelectedEmbeddingModel() {
+        const models = this.settings.embeddingModels || [];
+        const enabled = models.filter(m => m.enabled);
+        const active = enabled.find(m => m.id === this.settings.selectedEmbeddingModelId)
+            || enabled[0]
+            || models[0];
+        return active || null;
+    }
+
     async saveSettings() {
         await this.saveData(this.settings);
     }
@@ -138,20 +147,17 @@ export default class RagPlugin extends Plugin {
             const baseUrl = this.settings.javaBackendUrl.replace(/\/$/, '');
             const syncUrl = `${baseUrl}/api/rag/sync`;
 
+            const embed = this.getSelectedEmbeddingModel();
             const payload = {
                 title: file.basename,
                 path: file.path,
                 content: content,
                 timestamp: Date.now(),
-                
-                // ✅ 关键修改：发送 Embedding 的完整配置
-                embeddingProvider: this.settings.selectedEmbeddingProvider, // 服务商 (aliyun)
-                embeddingModel: this.settings.embeddingModelName            // 模型名 (text-embedding-v1)
+                embeddingProvider: embed?.provider || '',
+                embeddingModel: embed?.model || ''
             };
 
-            // ✅ 关键修改：使用 Embedding 专属的 API Key
-            // 如果用户没填 Embedding Key，可以回退使用 LLM Key，或者留空
-            const apiKeyToUse = this.settings.embeddingApiKey;
+            const apiKeyToUse = embed?.apiKey || '';
 
             const response = await fetch(syncUrl, {
                 method: 'POST',

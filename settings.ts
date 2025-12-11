@@ -18,6 +18,17 @@ export interface ChatModelConfig {
 	enabled: boolean;  // 是否启用
 }
 
+// Embedding 模型配置（与 Chat 模型相同结构）
+export interface EmbeddingModelConfig {
+	id: string;
+	name: string;
+	provider: string;
+	model: string;
+	baseUrl: string;
+	apiKey: string;
+	enabled: boolean;
+}
+
 export interface RagSettings {
 	javaBackendUrl: string;
 
@@ -26,9 +37,8 @@ export interface RagSettings {
 	selectedChatModelId: string;       // 当前选中的模型 ID
 
 	// --- Embedding 设置 ---
-	selectedEmbeddingProvider: string;
-	embeddingApiKey: string; // ✅ 新增：Embedding 独立 Key
-	embeddingModelName: string; // ✅ 新增：Embedding 模型名称 (如 text-embedding-v1)
+	embeddingModels: EmbeddingModelConfig[]; // 可用的 embedding 模型列表
+	selectedEmbeddingModelId: string;        // 当前选中的 embedding 模型 ID
 
 	// --- 同步设置 ---
 	enableSync: boolean; // 是否开启同步
@@ -71,9 +81,18 @@ export const DEFAULT_SETTINGS: RagSettings = {
 	],
 	selectedChatModelId: "deepseek-chat",
 
-	selectedEmbeddingProvider: "aliyun",
-	embeddingApiKey: "",
-	embeddingModelName: "text-embedding-v1", // 默认值
+	embeddingModels: [
+		{
+			id: "aliyun-embed",
+			name: "Aliyun Embedding",
+			provider: "aliyun",
+			model: "text-embedding-v1",
+			baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+			apiKey: "",
+			enabled: true,
+		},
+	],
+	selectedEmbeddingModelId: "aliyun-embed",
 
 	enableSync: true,
 	debounceDelay: 2000,
@@ -96,12 +115,19 @@ export function normalizeSettings(raw: RagSettings): RagSettings {
 	if (!settings.chatModels || settings.chatModels.length === 0) {
 		settings.chatModels = DEFAULT_SETTINGS.chatModels.map(m => ({ ...m }));
 	}
-
-	// 兜底选中模型：优先启用的第一条
-	const enabledModels = settings.chatModels.filter(m => m.enabled);
-	const fallback = enabledModels[0] || settings.chatModels[0];
+	const enabledChat = settings.chatModels.filter(m => m.enabled);
+	const chatFallback = enabledChat[0] || settings.chatModels[0];
 	if (!settings.selectedChatModelId || !settings.chatModels.some(m => m.id === settings.selectedChatModelId)) {
-		settings.selectedChatModelId = fallback?.id || "";
+		settings.selectedChatModelId = chatFallback?.id || "";
+	}
+
+	if (!settings.embeddingModels || settings.embeddingModels.length === 0) {
+		settings.embeddingModels = DEFAULT_SETTINGS.embeddingModels.map(m => ({ ...m }));
+	}
+	const enabledEmbed = settings.embeddingModels.filter(m => m.enabled);
+	const embedFallback = enabledEmbed[0] || settings.embeddingModels[0];
+	if (!settings.selectedEmbeddingModelId || !settings.embeddingModels.some(m => m.id === settings.selectedEmbeddingModelId)) {
+		settings.selectedEmbeddingModelId = embedFallback?.id || "";
 	}
 
 	return settings;
