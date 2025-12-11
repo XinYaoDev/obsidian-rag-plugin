@@ -1,76 +1,56 @@
-# Obsidian RAG Assistant (Frontend)
+# Aki · Obsidian RAG Assistant (Frontend)
 
 <div align="center">
 
-### 🚀 Supercharge Your Obsidian Second Brain with AI
-
-[![English](https://img.shields.io/badge/Language-English-blue?style=for-the-badge)](./README_en.md)
-[![Chinese](https://img.shields.io/badge/Language-中文-red?style=for-the-badge)](./README.md)
+### 🚀 Supercharge Your Obsidian Second Brain with AI (RAG)
 
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](./LICENSE)
-[![Release](https://img.shields.io/github/v/release/XinYaoDev/obsidian-rag-plugin?style=for-the-badge&color=orange)](https://github.com/XinYaoDev/obsidian-rag-plugin/releases)
 
 </div>
 
 ---
 
-This is an **RAG (Retrieval-Augmented Generation)** based personal knowledge assistant plugin for Obsidian.
-It is not just a simple AI chat interface. By connecting to a local **Java Backend**, it transforms your Obsidian notes into a vector knowledge base, enabling precise Q&A based on your personal knowledge reserve.
-
-> [!IMPORTANT] > **⚠️ Frontend-Backend Separation**
->
-> This repository contains **Frontend (Obsidian Plugin)** code only.
-> You must run the companion Backend service for it to work.
->
-> 👉 **Backend Repository:** [**obsidian-rag-backend**](https://github.com/XinYaoDev/obsidian-rag-backend)
+**Aki** is an Obsidian plugin that turns your vault into a retrieval-augmented (RAG) knowledge base. It talks to a separate **Java backend** that handles embedding and chat. Run the backend to make the plugin work.
 
 ---
 
 ## ✨ Features
 
-### 🧠 Core Capabilities
+### 🧠 Chat + RAG
+- Chats against your vault; user messages and history expand `[[note]]` links into note content before sending.
+- Supports DeepSeek, Qwen (Aliyun), OpenAI, Moonshot, Ollama via configurable provider/model/API key.
+- Separate embedding provider/model/key for syncing to the backend.
+- Optional **Deep Thinking** toggle: streams a “thinking” pane then collapses when answers start.
 
--   **Chat with Notes:** Utilizing RAG technology, the AI retrieves relevant information from your notes before answering. Let the AI truly "read" your books to avoid hallucinations.
--   **🚀 Deep Thinking Mode (CoT):**
-    -   Integrated with **DeepSeek R1** / **Qwen QwQ** reasoning models.
-    -   Provides an **independent toggle** to enable "Deep Thinking" with one click.
-    -   Displays the AI's **Chain of Thought (CoT)**, showing not just the result, but the logical deduction process.
+### 💬 Chat experience
+- Contenteditable input with:
+  - `[[` to open recent-note picker (mtime-desc, top 5) and insert internal links.
+  - Space + `@` to open prompt picker from `prompts/*.md` (inserts as `[[Prompt]]`).
+  - Input history (↑/↓), Ctrl/Cmd+Enter to send, Shift+Enter for newline.
+- Streaming answers with Abort (send button becomes stop). Errors auto-rollback last message.
+- Code blocks get language header + copy button; whole AI message copy + “export to active note” button.
+- Ctrl/Cmd+click internal links to open notes.
 
-### 🎨 Interactive Experience (UI/UX) NEW!
+### 💾 Sessions
+- Multi-session list with create, switch, rename, delete, trash, restore, permanent delete; trash auto-cleans items older than 7 days.
+- Data stored in-vault: `Assets/History/sessions_index.json`, `Assets/History/sessions/*.json`, `Assets/History/trash/*.json`.
+- Auto title generation after first Q&A using a configurable provider/model/key (fallback to LLM config).
+- Export latest AI answer to the active note, or auto-create `Aki 会话导出 <timestamp>.md`.
 
--   **📋 Seamless Copying:**
-    -   **Full-Text Copy:** Added a "Copy Full Text" button (icon + label) at the bottom left of AI message bubbles for one-click extraction.
-    -   **Code Optimization:** Code blocks now feature a sleek Header Bar displaying the language tag and a dedicated copy button.
--   **✨ Text Selection:** Optimized the message bubble interaction layer, ensuring you can freely select and copy any text segment within the chat.
--   **UI Polish:** Refined visual alignment and button sizing using enhanced Flexbox layouts to maintain a clean and consistent interface.
-
-### 💾 Session Management
-
--   **Conversation Persistence:** Chat history is automatically saved in `Assets/History/chat_history.json` within your Vault. Your data stays in your hands.
--   **Context Memory:** Automatically loads the last conversation context upon restarting Obsidian, supporting multi-turn dialogue.
--   **One-Click Reset:** A trash can icon allows you to clear history instantly and start a new topic.
-
-### ⚙️ Flexibility & Intelligence
-
--   **Multi-Model Support:** Compatible with DeepSeek, Aliyun Qwen, OpenAI, Ollama, and other major providers.
--   **Smart Sync:** Listens for file changes (`modify`/`create`) and automatically syncs updates to the backend for vectorization. Built-in **Debounce** mechanism ensures compatibility with sync plugins like Remote Save.
-
----
-
-## 📸 Screenshots
-
-_(Placeholder for screenshot showing the sidebar chat, code block header styles, and the full-text copy button)_
+### 🔄 Smart sync to backend
+- Watches markdown `modify/create` events; only syncs the *active file* when sync is enabled.
+- Ignores background sync (e.g., Remote Save) by requiring recent user typing (<3s).
+- Debounced (2s) upload to `POST /api/rag/sync` with title/path/content and embedding config.
 
 ---
 
 ## 🛠️ Installation
 
-This project is currently in the development phase. It is recommended to install via source code.
+Dev-mode install is recommended.
 
 ### 1. Prerequisites
-
--   Ensure **Node.js (v16+)** is installed.
--   Ensure the **RAG Backend Service** is running (default port `8081`).
+- Node.js 18+
+- The companion Java backend running (default `http://localhost:8081`)
 
 ### 2. Development Mode Installation
 
@@ -80,7 +60,7 @@ This project is currently in the development phase. It is recommended to install
     ```
 2.  Clone the repository:
     ```bash
-    git clone [https://github.com/XinYaoDev/obsidian-rag-plugin.git](https://github.com/XinYaoDev/obsidian-rag-plugin.git) my-rag-plugin
+    git clone https://github.com/XinYaoDev/obsidian-rag-plugin.git my-rag-plugin
     cd my-rag-plugin
     ```
 3.  Install dependencies and start watching:
@@ -88,63 +68,57 @@ This project is currently in the development phase. It is recommended to install
     npm install
     npm run dev
     ```
-4.  Open Obsidian, go to **Settings -> Community Plugins**, and enable **RAG Assistant**.
+4.  In Obsidian enable **Aki** under **Settings → Community plugins**.
 
 ---
 
 ## ⚙️ Configuration
 
-After enabling the plugin, go to **Settings -> RAG Assistant**:
+Open **Settings → Aki 配置**.
 
-### Basic Settings
+### Backend
+- **Java Backend URL** (no trailing slash), default `http://localhost:8081`.
 
--   **Java Backend URL:** Default is `http://localhost:8081`.
+### LLM (chat)
+- **Provider / Model / API Key** (DeepSeek, Qwen, OpenAI, Moonshot, Ollama).
+- Deep Thinking uses these unless title-generation is separately configured.
 
-### LLM Settings
+### Embedding (sync)
+- **Provider / Model / API Key** used by `/api/rag/sync`. Embedding key can differ from LLM key (fallback to LLM key if empty).
 
--   **Provider:** Select `Aliyun` (Qwen), `DeepSeek`, etc.
--   **API Key:** Enter the API Key provided by your cloud vendor.
--   **Model Name:**
-    -   _Standard Mode:_ Recommended `qwen-plus` or `deepseek-chat`.
-    -   _Deep Thinking:_ Recommended `qwq-32b-preview` or `deepseek-reasoner` (requires backend support).
-
-### Embedding Settings
-
--   **Model Name:** e.g., `text-embedding-v3` or `text-embedding-v1`.
+### Advanced
+- **Deep Thinking toggle** (per-chat UI switch).
+- **Auto-generate session title**: optional provider/model/API key; falls back to LLM config if empty.
+- **Sync enable**: master switch for file uploads (debounce 2s).
 
 ---
 
 ## 🖥️ Usage Guide
 
-1.  **Open Assistant:** Click the **🤖 Robot Icon** in the left ribbon.
-2.  **Enable Deep Thinking:** (Optional) Toggle the **🧠 Deep Thinking** switch above the input box.
-3.  **Ask Questions:** Type your question and press **Enter** to send.
-4.  **Copy Content:** Click the icon in the code block header to copy code, or use the button at the bottom of the bubble to copy the full response.
-5.  **Manage History:** Click the **🗑️ Trash Can** icon in the top toolbar to clear the current context.
+1) Click the left-ribbon bot icon to open Aki (opens in the right pane).  
+2) Type and **Enter** / **Ctrl/Cmd+Enter** to send; **Shift+Enter** for newline.  
+3) `[[` picks a recent note; space + `@` picks a prompt from `prompts/*.md`.  
+4) Toggle **Deep Thinking** above the input when needed.  
+5) Copy code via block header; copy whole answer or export to the active note via bubble buttons.  
+6) Manage sessions via the toolbar: list/switch, new, rename, delete to trash, restore, clear messages, empty trash.
 
 ---
 
 ## 📅 Roadmap
 
-We are continuously improving the experience. Here is what's coming next:
-
--   [x] Basic RAG Conversation & Auto-Sync
--   [x] **Deep Thinking (CoT) Display & Toggle**
--   [x] **Conversation History Persistence**
--   [x] **📋 One-Click Copy:** Support copying code blocks or full AI responses with one click.
--   [ ] **🛑 Stop Generation:** Button to interrupt AI output at any time.
--   [ ] **📝 Auto-Summary:** Automatically generate conversation titles based on chat content and display a history list in the sidebar.
--   [ ] **🌊 Streaming Response:** Optimize typewriter effect to reduce perceived latency.
--   [ ] **🔗 Source Citation:** Clickable citation badges in answers that jump to the corresponding note paragraph.
+- [x] Streaming chat with abort
+- [x] Deep Thinking toggle + thinking panel
+- [x] Multi-session with trash and auto title generation
+- [x] Prompt/note pickers, input history, export to note, code/full copy
+- [x] Smart sync with active-file + debounce filter
+- [ ] Source citation badges back to notes
+- [ ] UI polish & mobile testing
 
 ---
 
 ## 🤝 Contributing
 
-Issues and Pull Requests are welcome!
-
--   **Frontend Issues:** Please submit to this repository.
--   **Backend/Algo Issues:** Please submit to the [Backend Repository](https://github.com/XinYaoDev/obsidian-rag-backend).
+Issues and PRs are welcome. Backend issues should go to the Java backend repo you use.
 
 ## 📄 License
 

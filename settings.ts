@@ -1,27 +1,29 @@
 // settings.ts
 
-// 定义可选的服务商列表
-export const LLM_PROVIDERS = [
-	{ text: "DeepSeek (深度求索)", value: "deepseek" },
-	{ text: "Aliyun (通义千问)", value: "aliyun" },
-	{ text: "OpenAI (官方)", value: "openai" },
-	{ text: "Ollama (本地)", value: "ollama" },
-	{ text: "Moonshot (Kimi)", value: "moonshot" },
-];
-
+// 定义可选的服务商列表（用于 Embedding 下拉）
 export const EMBEDDING_PROVIDERS = [
 	{ text: "Aliyun (通义 DashScope)", value: "aliyun" },
 	{ text: "OpenAI (Text-Embed)", value: "openai" },
 	{ text: "Ollama (本地)", value: "ollama" },
 ];
 
+// Chat 模型配置
+export interface ChatModelConfig {
+	id: string;        // 唯一 ID
+	name: string;      // 模型展示名称
+	provider: string;  // 厂商标识（传给后端）
+	model: string;     // 模型名（传给后端）
+	baseUrl: string;   // 模型的 Base URL
+	apiKey: string;    // 模型专属 API Key
+	enabled: boolean;  // 是否启用
+}
+
 export interface RagSettings {
 	javaBackendUrl: string;
 
 	// --- LLM 设置 ---
-	selectedLlmProvider: string;
-	llmApiKey: string;
-	llmModelName: string; // ✅ 新增：LLM 模型名称 (如 deepseek-coder)
+	chatModels: ChatModelConfig[];     // 可用的聊天模型列表
+	selectedChatModelId: string;       // 当前选中的模型 ID
 
 	// --- Embedding 设置 ---
 	selectedEmbeddingProvider: string;
@@ -47,9 +49,27 @@ export interface RagSettings {
 export const DEFAULT_SETTINGS: RagSettings = {
 	javaBackendUrl: "http://localhost:8081",
 
-	selectedLlmProvider: "deepseek",
-	llmApiKey: "",
-	llmModelName: "deepseek-chat", // 默认值
+	chatModels: [
+		{
+			id: "deepseek-chat",
+			name: "DeepSeek Chat",
+			provider: "deepseek",
+			model: "deepseek-chat",
+			baseUrl: "https://api.deepseek.com",
+			apiKey: "",
+			enabled: true,
+		},
+		{
+			id: "aliyun-qwen-max",
+			name: "Aliyun Qwen-Max",
+			provider: "aliyun",
+			model: "qwen-max",
+			baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+			apiKey: "",
+			enabled: true,
+		},
+	],
+	selectedChatModelId: "deepseek-chat",
 
 	selectedEmbeddingProvider: "aliyun",
 	embeddingApiKey: "",
@@ -68,3 +88,21 @@ export const DEFAULT_SETTINGS: RagSettings = {
 	// 提示词使用记录
 	promptUsage: {},
 };
+
+// 规范化设置：填充缺失字段 & 兜底选择
+export function normalizeSettings(raw: RagSettings): RagSettings {
+	const settings: RagSettings = Object.assign({}, DEFAULT_SETTINGS, raw || {});
+
+	if (!settings.chatModels || settings.chatModels.length === 0) {
+		settings.chatModels = DEFAULT_SETTINGS.chatModels.map(m => ({ ...m }));
+	}
+
+	// 兜底选中模型：优先启用的第一条
+	const enabledModels = settings.chatModels.filter(m => m.enabled);
+	const fallback = enabledModels[0] || settings.chatModels[0];
+	if (!settings.selectedChatModelId || !settings.chatModels.some(m => m.id === settings.selectedChatModelId)) {
+		settings.selectedChatModelId = fallback?.id || "";
+	}
+
+	return settings;
+}

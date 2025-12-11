@@ -1,7 +1,7 @@
 // SettingTab.ts
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting, Modal } from 'obsidian';
 import type RagPlugin from './main';
-import { LLM_PROVIDERS, EMBEDDING_PROVIDERS } from './settings';
+import { EMBEDDING_PROVIDERS } from './settings';
 
 export class RagSettingTab extends PluginSettingTab {
     plugin: RagPlugin;
@@ -13,11 +13,29 @@ export class RagSettingTab extends PluginSettingTab {
 
     display(): void {
         const { containerEl } = this;
-        containerEl.empty();
+        const render = (tab: 'general' | 'model') => {
+            containerEl.empty();
+            containerEl.createEl('h2', { text: 'Aki 配置' });
 
-        containerEl.createEl('h2', { text: 'Aki 配置 (完整版)' });
+            const tabs = containerEl.createDiv({ cls: 'settings-tabs' });
+            const generalBtn = tabs.createEl('button', { cls: `tab-btn ${tab === 'general' ? 'active' : ''}`, text: 'General' });
+            const modelBtn = tabs.createEl('button', { cls: `tab-btn ${tab === 'model' ? 'active' : ''}`, text: 'Model' });
 
-        // 1. Java 后端
+            generalBtn.onclick = () => render('general');
+            modelBtn.onclick = () => render('model');
+
+            if (tab === 'general') {
+                this.renderGeneral(containerEl);
+            } else {
+                this.renderModelTab(containerEl);
+            }
+        };
+
+        render('model');
+    }
+
+    private renderGeneral(containerEl: HTMLElement) {
+        // Java 后端
         new Setting(containerEl)
             .setName('Java 后端地址')
             .setDesc('Spring Boot 服务地址')
@@ -29,44 +47,7 @@ export class RagSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        // ================= LLM 设置 =================
-        containerEl.createEl('h3', { text: '🤖 对话模型 (LLM) 设置' });
-
-        new Setting(containerEl)
-            .setName('选择服务商')
-            .addDropdown(dropdown => {
-                LLM_PROVIDERS.forEach(p => dropdown.addOption(p.value, p.text));
-                dropdown.setValue(this.plugin.settings.selectedLlmProvider)
-                    .onChange(async (value) => {
-                        this.plugin.settings.selectedLlmProvider = value;
-                        await this.plugin.saveSettings();
-                    });
-            });
-
-        new Setting(containerEl)
-            .setName('LLM API Key')
-            .setDesc('对话模型的 API Key')
-            .addText(text => text
-                .setPlaceholder('sk-...')
-                .setValue(this.plugin.settings.llmApiKey)
-                .onChange(async (value) => {
-                    this.plugin.settings.llmApiKey = value;
-                    await this.plugin.saveSettings();
-                }));
-
-        // ✅ 新增：LLM 模型名称
-        new Setting(containerEl)
-            .setName('LLM 模型名称')
-            .setDesc('填入具体模型 ID (如 deepseek-coder, qwen-turbo, gpt-4)')
-            .addText(text => text
-                .setPlaceholder('deepseek-chat')
-                .setValue(this.plugin.settings.llmModelName)
-                .onChange(async (value) => {
-                    this.plugin.settings.llmModelName = value;
-                    await this.plugin.saveSettings();
-                }));
-
-        // ================= Embedding 设置 =================
+        // Embedding 设置
         containerEl.createEl('h3', { text: '🧠 向量模型 (Embedding) 设置' });
 
         new Setting(containerEl)
@@ -80,10 +61,9 @@ export class RagSettingTab extends PluginSettingTab {
                     });
             });
 
-        // ✅ 新增：Embedding API Key
         new Setting(containerEl)
             .setName('Embedding API Key')
-            .setDesc('向量服务的 API Key (如果与 LLM 相同也请在此重复填写)')
+            .setDesc('向量服务的 API Key')
             .addText(text => text
                 .setPlaceholder('sk-...')
                 .setValue(this.plugin.settings.embeddingApiKey)
@@ -92,7 +72,6 @@ export class RagSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        // ✅ 新增：Embedding 模型名称
         new Setting(containerEl)
             .setName('Embedding 模型名称')
             .setDesc('填入具体模型 ID (如 text-embedding-v1, text-embedding-3-small)')
@@ -104,7 +83,7 @@ export class RagSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
         
-        // ================= 其他设置 =================
+        // 其他设置
         containerEl.createEl('h3', { text: '⚙️ 其他设置' });
          new Setting(containerEl)
             .setName('启用自动同步')
@@ -116,22 +95,21 @@ export class RagSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        // ================= 高级设置 =================
+        // 高级设置 - 标题生成
         containerEl.createEl('h3', { text: '🔧 高级设置' });
-
-        // 自动生成会话标题设置
         containerEl.createEl('h4', { text: '自动生成会话标题' });
         containerEl.createEl('p', { 
-            text: '配置用于自动生成会话标题的模型。如果不配置，将使用对话模型（LLM）的设置。',
+            text: '配置用于自动生成会话标题的模型。如果不配置，将使用当前聊天模型。',
             cls: 'setting-item-description'
         });
 
+        const providerOptions = Array.from(new Set(this.plugin.settings.chatModels.map(m => m.provider)));
         new Setting(containerEl)
             .setName('标题生成服务商')
-            .setDesc('选择用于生成会话标题的模型服务商')
             .addDropdown(dropdown => {
-                LLM_PROVIDERS.forEach(p => dropdown.addOption(p.value, p.text));
-                dropdown.setValue(this.plugin.settings.titleGenerationProvider || this.plugin.settings.selectedLlmProvider)
+                providerOptions.forEach(p => dropdown.addOption(p, p));
+                const fallback = this.plugin.settings.chatModels[0]?.provider || '';
+                dropdown.setValue(this.plugin.settings.titleGenerationProvider || fallback)
                     .onChange(async (value) => {
                         this.plugin.settings.titleGenerationProvider = value;
                         await this.plugin.saveSettings();
@@ -140,10 +118,9 @@ export class RagSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('标题生成模型名称')
-            .setDesc('填入具体模型 ID (如 deepseek-chat, qwen-turbo, gpt-4)')
             .addText(text => text
                 .setPlaceholder('deepseek-chat')
-                .setValue(this.plugin.settings.titleGenerationModelName || this.plugin.settings.llmModelName)
+                .setValue(this.plugin.settings.titleGenerationModelName || (this.plugin.settings.chatModels.find(m => m.id === this.plugin.settings.selectedChatModelId)?.model || ''))
                 .onChange(async (value) => {
                     this.plugin.settings.titleGenerationModelName = value;
                     await this.plugin.saveSettings();
@@ -151,7 +128,7 @@ export class RagSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('标题生成 API Key')
-            .setDesc('标题生成模型的 API Key（留空则使用 LLM API Key）')
+            .setDesc('标题生成模型的 API Key')
             .addText(text => text
                 .setPlaceholder('sk-...')
                 .setValue(this.plugin.settings.titleGenerationApiKey)
@@ -159,5 +136,128 @@ export class RagSettingTab extends PluginSettingTab {
                     this.plugin.settings.titleGenerationApiKey = value;
                     await this.plugin.saveSettings();
                 }));
+    }
+
+    private renderModelTab(containerEl: HTMLElement) {
+        const header = containerEl.createDiv({ cls: 'model-tab-header' });
+        header.createEl('h3', { text: '🤖 Chat Models' });
+        const addBtn = header.createEl('button', { text: '+ Add Model', cls: 'model-add-btn' });
+
+        const table = containerEl.createDiv({ cls: 'model-table' });
+        const head = table.createDiv({ cls: 'model-table__head' });
+        head.createDiv({ text: 'Model', cls: 'model-col model-col--name' });
+        head.createDiv({ text: 'Provider', cls: 'model-col model-col--provider' });
+        head.createDiv({ text: 'Enable', cls: 'model-col model-col--enable' });
+        head.createDiv({ text: 'Actions', cls: 'model-col model-col--actions' });
+
+        const body = table.createDiv({ cls: 'model-table__body' });
+
+        const renderRows = () => {
+            body.empty();
+            this.plugin.settings.chatModels.forEach(model => {
+                const row = body.createDiv({ cls: 'model-row' });
+                row.createDiv({ text: model.name || model.model || '未命名', cls: 'model-col model-col--name' });
+                row.createDiv({ text: model.provider || '-', cls: 'model-col model-col--provider' });
+
+                const enableCol = row.createDiv({ cls: 'model-col model-col--enable' });
+                const enableToggle = enableCol.createEl('input', { type: 'checkbox' });
+                enableToggle.checked = model.enabled;
+                enableToggle.onchange = async () => {
+                    model.enabled = enableToggle.checked;
+                    await this.plugin.saveSettings();
+                    this.ensureSelectedChatModel();
+                    renderRows();
+                };
+
+                const actions = row.createDiv({ cls: 'model-col model-col--actions' });
+                const editBtn = actions.createEl('button', { cls: 'icon-btn', attr: { 'aria-label': '编辑' } });
+                editBtn.innerHTML = '✏️';
+                editBtn.onclick = () => {
+                    new ModelEditModal(this.app, model, async (updated) => {
+                        Object.assign(model, updated);
+                        await this.plugin.saveSettings();
+                        this.ensureSelectedChatModel();
+                        renderRows();
+                    }).open();
+                };
+                const deleteBtn = actions.createEl('button', { cls: 'icon-btn', attr: { 'aria-label': '删除' } });
+                deleteBtn.innerHTML = '🗑️';
+                deleteBtn.onclick = async () => {
+                    const idx = this.plugin.settings.chatModels.findIndex(m => m.id === model.id);
+                    if (idx >= 0) {
+                        this.plugin.settings.chatModels.splice(idx, 1);
+                        this.ensureSelectedChatModel();
+                        await this.plugin.saveSettings();
+                        renderRows();
+                    }
+                };
+            });
+        };
+
+        addBtn.onclick = async () => {
+            const newModel = {
+                id: `model-${Date.now()}`,
+                name: 'New Model',
+                provider: '',
+                model: '',
+                baseUrl: '',
+                apiKey: '',
+                enabled: true,
+            };
+            this.plugin.settings.chatModels.push(newModel);
+            this.ensureSelectedChatModel();
+            await this.plugin.saveSettings();
+            renderRows();
+        };
+
+        renderRows();
+    }
+
+    private ensureSelectedChatModel() {
+        const enabled = this.plugin.settings.chatModels.filter(m => m.enabled);
+        if (!this.plugin.settings.selectedChatModelId || !enabled.some(m => m.id === this.plugin.settings.selectedChatModelId)) {
+            const fallback = enabled[0] || this.plugin.settings.chatModels[0];
+            this.plugin.settings.selectedChatModelId = fallback?.id || '';
+        }
+    }
+}
+
+class ModelEditModal extends Modal {
+    private model: any;
+    private onSave: (model: any) => void;
+
+    constructor(app: App, model: any, onSave: (model: any) => void) {
+        super(app);
+        this.model = { ...model };
+        this.onSave = onSave;
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.createEl('h3', { text: '编辑模型' });
+
+        const buildInput = (label: string, value: string, placeholder: string, onChange: (v: string) => void) => {
+            new Setting(contentEl)
+                .setName(label)
+                .addText(text => text
+                    .setPlaceholder(placeholder)
+                    .setValue(value || '')
+                    .onChange((val) => onChange(val.trim())));
+        };
+
+        buildInput('Model（展示名称）', this.model.name, '如 DeepSeek Chat', (v) => this.model.name = v);
+        buildInput('Provider', this.model.provider, '如 deepseek、aliyun', (v) => this.model.provider = v);
+        buildInput('Model Name', this.model.model, '如 deepseek-chat、qwen-plus', (v) => this.model.model = v);
+        buildInput('Base URL', this.model.baseUrl, 'https://...', (v) => this.model.baseUrl = v.replace(/\/$/, ''));
+        buildInput('API Key', this.model.apiKey, 'sk-...', (v) => this.model.apiKey = v);
+
+        const footer = contentEl.createDiv({ cls: 'modal-footer' });
+        const saveBtn = footer.createEl('button', { text: '保存' });
+        const cancelBtn = footer.createEl('button', { text: '取消' });
+        saveBtn.onclick = () => {
+            this.onSave(this.model);
+            this.close();
+        };
+        cancelBtn.onclick = () => this.close();
     }
 }

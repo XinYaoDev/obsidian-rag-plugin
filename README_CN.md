@@ -1,149 +1,121 @@
-# Obsidian RAG Assistant (Frontend)
+# Aki · Obsidian RAG Assistant (Frontend)
 
 <div align="center">
 
-### 🚀 为你的 Obsidian 第二大脑装上 AI 引擎
-
-[![English](https://img.shields.io/badge/Language-English-blue?style=for-the-badge)](./README_en.md)
-[![Chinese](https://img.shields.io/badge/Language-中文-red?style=for-the-badge)](./README.md)
+### 🚀 为你的 Obsidian 第二大脑装上 RAG 引擎
 
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](./LICENSE)
-[![Release](https://img.shields.io/github/v/release/XinYaoDev/obsidian-rag-plugin?style=for-the-badge&color=orange)](https://github.com/XinYaoDev/obsidian-rag-plugin/releases)
 
 </div>
 
 ---
 
-这是一个基于 **RAG (检索增强生成)** 架构的 Obsidian 个人知识库助手插件，现名为 **Aki**。
-它不仅仅是一个简单的 AI 聊天窗口，而是通过连接本地运行的 **Java 后端**，将你的 Obsidian 笔记转化为向量知识库，实现基于你个人知识储备的精准问答。
-
-> [!IMPORTANT] > **⚠️ 这是一个前后端分离的项目**
->
-> 本仓库仅包含 **前端 (Obsidian 插件)** 代码。你必须同时运行配套的后端服务才能正常工作。
->
-> 👉 **后端仓库地址:** [**obsidian-rag-backend**](https://github.com/XinYaoDev/obsidian-rag-backend)
+**Aki** 是一个基于检索增强 (RAG) 的 Obsidian 插件。它需要配套的 **Java 后端** 负责向量化与对话，请先启动后端服务。
 
 ---
 
-## ✨ 主要特性 (Features)
+## ✨ 主要特性
 
-### 🧠 核心能力
+### 🧠 对话 + RAG
+- 对话前会把用户消息/历史里的 `[[笔记]]` 展开为笔记内容再发送给后端。
+- 支持 DeepSeek、通义千问 (Aliyun)、OpenAI、Moonshot、Ollama 等服务商（可配置模型与 API Key）。
+- 向量同步可使用独立的 Embedding 服务商/模型/API Key。
+- **深度思考开关**：开启后先流式展示“思考过程”，开始回答时自动收起。
 
--   **知识库对话 (Chat with Notes):** 基于 RAG 技术，AI 会先检索你的笔记，再回答问题。让 AI 真正“读过”你的书，拒绝胡说八道。
--   **🚀 深度思考模式 (Deep Thinking):**
-    -   集成 **DeepSeek R1** / **Qwen QwQ** 等推理模型。
-    -   提供**独立开关**，一键开启“深度思考”。
-    -   支持展示 AI 的 **思维链 (Chain of Thought)**，让答案不仅有结果，更有逻辑推导过程。
-
-### 🎨 交互体验 (UI/UX) NEW!
-
--   **📋 便捷复制:**
-    -   **全文复制:** AI 回复气泡左下角提供“复制全文”按钮，一键提取完整回答。
-    -   **代码优化:** 代码块顶部增加了 Header Bar，清晰展示语言类型，并支持单独复制代码片段。
--   **✨ 文本选择:** 优化了消息气泡的交互层级，现在你可以自由选择并复制气泡内的任意文本段落。
--   **UI 细节打磨:** 采用 Flexbox 布局优化按钮对齐与视觉效果，保持界面整洁美观。
+### 💬 聊天体验
+- Contenteditable 输入框：
+  - 输入 `[[` 弹出最近笔记选择器（按修改时间倒序，最多 5 条），插入内部链接。
+  - 输入“空格 + @”弹出 `prompts/*.md` 提示词选择器（以 `[[Prompt]]` 插入）。
+  - 输入历史 ↑/↓，Ctrl/Cmd+Enter 发送，Shift+Enter 换行。
+- 流式回答，发送键可一键终止；失败会自动撤回消息。
+- 代码块带语言标签与复制按钮；AI 气泡支持全文复制并可导出到当前笔记。
+- Ctrl/Cmd+点击内部链接即可打开笔记。
 
 ### 💾 会话管理
+- 会话列表支持创建、切换、重命名、删除、回收站、恢复、彻底删除；回收站超过 7 天自动清理。
+- 数据存储在本地 vault：`Assets/History/sessions_index.json`、`Assets/History/sessions/*.json`、`Assets/History/trash/*.json`。
+- 首轮问答后自动生成会话标题（可独立配置服务商/模型/API Key，留空则回退到 LLM 配置）。
+- 将最新一条 AI 回复覆盖导出到当前笔记，若无打开笔记则自动创建 `Aki 会话导出 <timestamp>.md`。
 
--   **对话持久化:** 聊天记录自动保存在 Vault 的 `Assets/History/chat_history.json` 文件中，数据完全掌握在你手中。
--   **上下文记忆:** 重启 Obsidian 后自动加载上次的对话上下文，支持多轮连续问答。
--   **一键重置:** 提供垃圾桶图标，随时清空历史，开启新的话题。
-
-### ⚙️ 灵活与智能
-
--   **多模型支持:** 兼容 DeepSeek, Aliyun Qwen, OpenAI, Ollama 等主流服务商。
--   **智能同步:** 监听文件修改 (`modify`/`create`)，自动将笔记变更同步至后端进行向量化。内置 **防抖 (Debounce)** 机制，完美兼容 Remote Save 等同步插件。
-
----
-
-## 📸 界面预览 (Screenshots)
-
-_(此处建议放一张截图，展示侧边栏聊天窗口、代码块的 Header 样式以及全文复制按钮)_
+### 🔄 智能同步
+- 监听 Markdown `modify/create` 事件，仅同步当前激活编辑的文件。
+- 需要最近 3 秒内有用户输入以过滤 Remote Save 等后台改动。
+- 2 秒防抖后上传到 `POST /api/rag/sync`，携带标题/路径/内容及 Embedding 配置。
 
 ---
 
-## 🛠️ 安装与使用 (Installation)
+## 🛠️ 安装 (开发模式)
 
-由于本项目处于开发阶段，建议通过源码安装调试。
+### 前置
+- Node.js 18+
+- 运行中的 Java 后端（默认 `http://localhost:8081`）
 
-### 1. 前置条件
-
--   确保你已安装 **Node.js (v16+)**。
--   确保你已启动 **RAG Backend 服务** (默认端口 `8081`)。
-
-### 2. 开发模式安装
-
-1.  进入你的 Obsidian 插件目录：
+### 步骤
+1. 进入 Obsidian 插件目录：
     ```bash
-    cd <你的Obsidian仓库路径>/.obsidian/plugins/
+    cd <你的Vault路径>/.obsidian/plugins/
     ```
-2.  克隆仓库：
+2. 克隆仓库：
     ```bash
-    git clone [https://github.com/XinYaoDev/obsidian-rag-plugin.git](https://github.com/XinYaoDev/obsidian-rag-plugin.git) my-rag-plugin
+    git clone https://github.com/XinYaoDev/obsidian-rag-plugin.git my-rag-plugin
     cd my-rag-plugin
     ```
-3.  安装依赖并启动监听：
+3. 安装依赖并启动监听：
     ```bash
     npm install
     npm run dev
     ```
-4.  打开 Obsidian，在 **设置 -> 第三方插件** 中启用 **RAG Assistant**。
+4. 在 Obsidian 的 **设置 → 第三方插件** 中启用 **Aki**。
 
 ---
 
-## ⚙️ 配置说明 (Configuration)
+## ⚙️ 配置
 
-启用插件后，请进入 **设置 (Settings) -> Aki 配置**：
+入口：**设置 → Aki 配置**。
 
-### 基础设置
+### 后端
+- **Java 后端地址**（去掉末尾 `/`），默认 `http://localhost:8081`。
 
--   **Java 后端地址:** 默认为 `http://localhost:8081`。
+### 对话 (LLM)
+- **服务商 / 模型 / API Key**（DeepSeek、Qwen、OpenAI、Moonshot、Ollama）。
+- 深度思考复用此配置，除非单独配置了标题生成。
 
-### LLM 模型设置
+### 向量 (Embedding)
+- **服务商 / 模型 / API Key** 用于 `/api/rag/sync`，若空则回退到 LLM Key。
 
--   **服务商:** 选择 `Aliyun` (通义千问) 或 `DeepSeek` 等。
--   **API Key:** 填入云厂商提供的 API Key。
--   **模型名称:**
-    -   _常规模式:_ 推荐 `qwen-plus` 或 `deepseek-chat`。
-    -   _深度思考:_ 推荐 `qwq-32b-preview` 或 `deepseek-reasoner` (需后端支持)。
-
-### 向量模型 (Embedding)
-
--   **模型名称:** 例如 `text-embedding-v3` 或 `text-embedding-v1`。
-
----
-
-## 🖥️ 使用指南 (Usage)
-
-1.  **打开助手:** 点击左侧侧边栏的 **🤖 机器人图标**。
-2.  **开启深度思考:** (可选) 点击输入框上方的 **🧠 Deep Thinking** 开关。
-3.  **提问:** 输入问题按 **Enter** 发送。
-4.  **复制内容:** 点击代码块右上角的图标复制一段代码，或点击气泡左下角的按钮复制全部回答。
-5.  **管理历史:** 点击顶部工具栏的 **🗑️ 垃圾桶** 可清空当前上下文。
+### 高级
+- **深度思考开关**（聊天面板按钮）。
+- **自动生成会话标题**：可独立配置服务商/模型/API Key，留空则用 LLM 配置。
+- **启用自动同步**：总开关，当前为 2 秒防抖。
 
 ---
 
-## 📅 开发计划 (Roadmap)
+## 🖥️ 使用
 
-我们正在持续改进体验，以下是即将到来的功能：
-
--   [x] 基础 RAG 对话功能 & 笔记自动同步
--   [x] **深度思考 (CoT) 展示与开关**
--   [x] **历史会话持久化**
--   [x] **📋 内容一键复制:** 支持一键复制 AI 回复的代码块或全文
--   [ ] **🛑 停止生成:** 添加“停止”按钮，随时中断 AI 的长文本输出。
--   [ ] **📝 历史会话自动总结:** 根据聊天内容自动生成会话标题，并在侧边栏展示历史列表。
--   [ ] **🌊 流式响应 (Streaming):** 优化打字机效果，降低等待感。
--   [ ] **🔗 引用来源跳转:** 点击回答中的引用角标，自动跳转到对应的笔记段落。
+1) 点击左侧栏机器人图标打开 Aki（右侧面板）。  
+2) 输入并回车/ Ctrl(Cmd)+Enter 发送；Shift+Enter 换行。  
+3) `[[` 选择最近笔记，空格 + `@` 选择 `prompts/*.md` 提示词。  
+4) 需要时开启 **深度思考**。  
+5) 代码块或全文一键复制，或导出到当前笔记。  
+6) 通过工具栏管理会话：列表/切换、新建、重命名、删除到回收站、恢复、清空消息、清空回收站。
 
 ---
 
-## 🤝 贡献 (Contributing)
+## 📅 开发计划
 
-欢迎提交 Issue 或 Pull Request！
+- [x] 流式聊天与终止
+- [x] 深度思考开关 + 思考面板
+- [x] 多会话 + 回收站 + 自动标题
+- [x] 提示词/笔记选择器、输入历史、导出笔记、复制增强
+- [x] 智能同步（仅活跃文件 + 防抖 + 用户输入过滤）
+- [ ] 回答引用角标跳转原笔记
+- [ ] UI 打磨与移动端测试
 
--   **前端问题:** 请提交至本仓库。
--   **后端/算法问题:** 请提交至 [后端仓库](https://github.com/XinYaoDev/obsidian-rag-backend)。
+---
+
+## 🤝 贡献
+
+欢迎提 Issue / PR。后端相关问题请提到对应 Java 后端仓库。
 
 ## 📄 License
 

@@ -1268,3 +1268,82 @@
         opacity: 0;
     }
 }
+
+/* ===========================
+   Model 设置页表格样式
+=========================== */
+.settings-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.tab-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary);
+    border-radius: 6px;
+    cursor: pointer;
+}
+.tab-btn.active {
+    border-color: var(--interactive-accent);
+    color: var(--interactive-accent);
+    box-shadow: 0 0 0 2px var(--background-modifier-border-focus);
+}
+
+.model-tab-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 12px 0;
+}
+.model-add-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: var(--background-secondary);
+    cursor: pointer;
+}
+
+.model-table {
+    width: 100%;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.model-table__head,
+.model-row {
+    display: grid;
+    grid-template-columns: 2fr 1.6fr 0.8fr 1.2fr;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+}
+.model-table__head {
+    background: var(--background-secondary);
+    font-weight: 600;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+.model-row {
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+.model-row:last-child {
+    border-bottom: none;
+}
+.model-col--actions {
+    display: flex;
+    gap: 8px;
+}
+.model-col--actions .icon-btn {
+    padding: 4px 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: var(--background-secondary);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+    line-height: 1;
+}

@@ -269,6 +269,62 @@ export class ChatView extends ItemView {
             new Notice(`深度思考模式已${status}`);
         };
 
+        // ================= LLM 选择器（厂商/模型） =================
+        const llmSelectorBtn = toggleContainer.createEl('button', { cls: 'llm-selector-btn' });
+        const getLlmLabel = () => {
+            const active = this.getSelectedChatModel();
+            if (active?.provider && active?.model) return `${active.provider}/${active.model}`;
+            return '选择模型';
+        };
+        const refreshLlmLabel = () => {
+            llmSelectorBtn.setText(getLlmLabel());
+        };
+        refreshLlmLabel();
+
+        let llmDropdown: HTMLElement | null = null;
+        const closeDropdown = () => {
+            llmDropdown?.remove();
+            llmDropdown = null;
+        };
+
+        const openDropdown = () => {
+            closeDropdown();
+            llmDropdown = toggleContainer.createDiv({ cls: 'llm-selector-dropdown' });
+
+            const models = (this.plugin.settings.chatModels || []).filter(m => m.enabled);
+            if (models.length === 0) {
+                llmDropdown.createSpan({ text: '请先在 Model 页添加启用的模型' });
+                return;
+            }
+
+            models.forEach((model) => {
+                const item = llmDropdown!.createDiv({ cls: 'llm-selector-item', text: `${model.provider}/${model.model}` });
+                item.addEventListener('click', async () => {
+                    this.plugin.settings.selectedChatModelId = model.id;
+                    await this.plugin.saveSettings();
+                    refreshLlmLabel();
+                    closeDropdown();
+                });
+            });
+
+            const onClickOutside = (e: MouseEvent) => {
+                if (llmDropdown && !llmDropdown.contains(e.target as Node) && e.target !== llmSelectorBtn) {
+                    closeDropdown();
+                    document.removeEventListener('click', onClickOutside);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', onClickOutside), 0);
+        };
+
+        llmSelectorBtn.onclick = (e) => {
+            e.stopPropagation();
+            if (llmDropdown) {
+                closeDropdown();
+            } else {
+                openDropdown();
+            }
+        };
+
         // ✅ 输入框和发送按钮的容器（保持在同一行）
         const inputRowContainer = inputArea.createEl('div', { cls: 'input-row-container' });
         const inputBoxContainer = inputRowContainer.createEl('div', { cls: 'input-box-container' });
@@ -616,9 +672,31 @@ export class ChatView extends ItemView {
             const backendUrl = this.plugin.settings.javaBackendUrl.replace(/\/$/, '');
             const chatUrl = `${backendUrl}/api/rag/chat/stream`;
 
-            const providerCode = this.plugin.settings.selectedLlmProvider;
-            const apiKey = this.plugin.settings.llmApiKey;
-            const modelName = this.plugin.settings.llmModelName;
+            const activeLlm = this.getSelectedChatModel();
+            const providerCode = activeLlm?.provider;
+            const apiKey = activeLlm?.apiKey;
+            const modelName = activeLlm?.model;
+            const llmBaseUrl = (activeLlm?.baseUrl || '').trim();
+
+            // 基础校验：必填项缺失时提示并终止发送
+            const missingFields: string[] = [];
+            if (!llmBaseUrl) missingFields.push('Base URL');
+            if (!modelName) missingFields.push('模型');
+            if (!providerCode) missingFields.push('服务商');
+            if (missingFields.length > 0) {
+                new Notice(`请先在设置中补全：${missingFields.join('、')}`);
+                // 恢复发送按钮状态
+                sendBtn.disabled = false;
+                sendBtn.style.opacity = '1';
+                sendBtn.style.cursor = 'pointer';
+                sendBtn.setAttribute('aria-label', '发送');
+                sendBtn.removeClass('stop-btn');
+                sendBtn.empty();
+                setIcon(sendBtn, 'send');
+                sendBtn.onclick = sendMessage;
+                this.isStreaming = false;
+                return;
+            }
 
             // 创建 AbortController 用于终止请求
             currentAbortController = new AbortController();
@@ -708,6 +786,7 @@ export class ChatView extends ItemView {
                         question: expandedQuestion,
                         provider: providerCode,
                         model: modelName,
+                        baseUrl: llmBaseUrl || undefined,
                         history: expandedHistory,
                         enableDeepThinking: this.plugin.settings.enableDeepThinking
                     },
@@ -1395,6 +1474,17 @@ export class ChatView extends ItemView {
                 this.setCursorToEnd(inputEl);
             }, 0);
         }
+    }
+
+    // 获取当前选中的 LLM 配置
+    private getSelectedChatModel() {
+        const settings = this.plugin.settings;
+        const models = settings.chatModels || [];
+        const enabled = models.filter(m => m.enabled);
+        const active = enabled.find(m => m.id === settings.selectedChatModelId)
+            || enabled[0]
+            || models[0];
+        return active || { id: '', name: '', provider: '', model: '', baseUrl: '', apiKey: '', enabled: false };
     }
 
     // ============================================================
@@ -2411,10 +2501,12 @@ export class ChatView extends ItemView {
             const backendUrl = this.plugin.settings.javaBackendUrl.replace(/\/$/, '');
             const chatUrl = `${backendUrl}/api/rag/chat`;
 
-            // 使用高级设置中的标题生成配置，如果没有配置则使用 LLM 配置
-            const providerCode = this.plugin.settings.titleGenerationProvider || this.plugin.settings.selectedLlmProvider;
-            const apiKey = this.plugin.settings.titleGenerationApiKey || this.plugin.settings.llmApiKey;
-            const modelName = this.plugin.settings.titleGenerationModelName || this.plugin.settings.llmModelName;
+            // 使用高级设置中的标题生成配置，如果没有配置则使用当前 LLM 配置
+            const activeLlm = this.getSelectedChatModel();
+            const providerCode = this.plugin.settings.titleGenerationProvider || activeLlm.provider;
+            const apiKey = this.plugin.settings.titleGenerationApiKey || activeLlm.apiKey;
+            const modelName = this.plugin.settings.titleGenerationModelName || activeLlm.model;
+            const llmBaseUrl = (activeLlm.baseUrl || '').trim();
 
             // 如果 API Key 为空，无法生成标题
             if (!apiKey || !apiKey.trim()) {
@@ -2442,6 +2534,7 @@ AI回答：${aiAnswer.substring(0, 200)}${aiAnswer.length > 200 ? '...' : ''}
                     question: prompt,
                     provider: providerCode,
                     model: modelName,
+                    baseUrl: llmBaseUrl || undefined,
                     history: [] // 空历史，只生成标题
                 })
             });

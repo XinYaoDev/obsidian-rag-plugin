@@ -2,7 +2,7 @@ import { Plugin, TFile, Notice } from 'obsidian';
 // 🔥 注意文件名的大小写，建议统一使用 ChatView (大写开头)
 import { ChatView, VIEW_TYPE_CHAT } from './chatView';
 // 🔥 引入我们拆分出来的设置定义
-import { RagSettings, DEFAULT_SETTINGS } from './settings';
+import { RagSettings, DEFAULT_SETTINGS, normalizeSettings } from './settings';
 import { RagSettingTab } from './settingTab';
 
 export default class RagPlugin extends Plugin {
@@ -68,7 +68,7 @@ export default class RagPlugin extends Plugin {
     }
 
     async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        this.settings = normalizeSettings(Object.assign({}, DEFAULT_SETTINGS, await this.loadData()));
     }
 
     async saveSettings() {
@@ -151,7 +151,7 @@ export default class RagPlugin extends Plugin {
 
             // ✅ 关键修改：使用 Embedding 专属的 API Key
             // 如果用户没填 Embedding Key，可以回退使用 LLM Key，或者留空
-            const apiKeyToUse = this.settings.embeddingApiKey || this.settings.llmApiKey;
+            const apiKeyToUse = this.settings.embeddingApiKey;
 
             const response = await fetch(syncUrl, {
                 method: 'POST',
