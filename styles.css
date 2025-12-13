@@ -1009,8 +1009,9 @@
 ========================================= */
 .message-actions {
     position: absolute;
-    left: 10px;
-    bottom: 10px;
+    left: auto !important;
+    right: 10px !important;
+    bottom: 10px !important;
     display: inline-flex;
     gap: 8px;
     background: transparent;
@@ -1143,11 +1144,13 @@
     color: var(--text-muted);
 }
 
-/* 展开按钮（折叠状态下显示在右侧） */
+/* 展开按钮（折叠状态下显示在右侧底部） */
 .message-expand-btn {
     position: absolute;
-    right: 10px;
-    top: 10px;
+    left: auto !important;
+    top: auto !important;
+    right: 10px !important;
+    bottom: 10px !important;
     display: none;
     align-items: center;
     justify-content: center;
