@@ -363,10 +363,37 @@ export class ChatView extends ItemView {
             }, 100); // 防抖，避免频繁渲染
         };
 
+        // IME 输入法状态跟踪：防止中文输入时字符重复
+        let isComposing = false;
+
+        // 监听输入法开始合成（compositionstart）
+        inputEl.addEventListener('compositionstart', () => {
+            isComposing = true;
+        });
+
+        // 监听输入法结束合成（compositionend）
+        inputEl.addEventListener('compositionend', () => {
+            isComposing = false;
+            // 输入法合成结束后，延迟处理一次，确保文本已更新
+            setTimeout(() => {
+                renderNoteLinks();
+            }, 0);
+        });
+
         // 检查是否触发提示词选择器（空格 + @）
         inputEl.addEventListener('input', (e: InputEvent) => {
+            // 如果正在使用输入法（IME）进行中文输入，跳过处理，避免字符重复
+            if (e.isComposing || isComposing) {
+                return;
+            }
+
             // 延迟检查，确保输入已完成
             setTimeout(() => {
+                // 再次检查，防止在延迟期间输入法状态改变
+                if (isComposing) {
+                    return;
+                }
+
                 const currentText = this.getTextFromContentEditable(inputEl);
                 const textBefore = this.getTextBeforeCursor(inputEl);
                 
