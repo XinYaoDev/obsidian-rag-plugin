@@ -2098,34 +2098,70 @@ export class ChatView extends ItemView {
         return copyBtn;
     }
 
-    // 添加全文复制按钮
+    // 添加全文复制按钮和操作区
     private addFullCopyButton(msgBubble: HTMLElement, text: string) {
-        // 操作按钮容器（右下角悬浮）
+        // 操作按钮容器（底部左侧对齐）
         let actions = msgBubble.querySelector('.message-actions') as HTMLElement | null;
         if (!actions) {
             actions = msgBubble.createEl('div', { cls: 'message-actions' });
         }
 
+        // 创建消息内容容器（用于折叠功能）
+        // 注意：需要在添加操作区之前创建，避免将操作区也移入内容容器
+        let contentContainer = msgBubble.querySelector('.message-content-container') as HTMLElement | null;
+        if (!contentContainer) {
+            // 将现有内容移动到内容容器中（排除操作区、展开按钮和头部）
+            const existingContent: Node[] = [];
+            msgBubble.childNodes.forEach(node => {
+                if (node !== actions && 
+                    !(node instanceof HTMLElement && (
+                        node.classList.contains('message-expand-btn') ||
+                        node.classList.contains('message-header')
+                    ))) {
+                    existingContent.push(node);
+                }
+            });
+            
+            if (existingContent.length > 0) {
+                contentContainer = msgBubble.createEl('div', { cls: 'message-content-container' });
+                existingContent.forEach(node => {
+                    contentContainer!.appendChild(node);
+                });
+            }
+        }
+
+        // 创建折叠按钮（最左侧）
+        const foldBtn = actions.createEl('button', {
+            cls: 'message-action-btn message-fold-btn',
+            attr: { 'aria-label': '折叠消息' }
+        });
+        const foldIcon = foldBtn.createEl('span', { cls: 'copy-btn-icon' });
+        setIcon(foldIcon, 'chevron-up');
+        const foldText = foldBtn.createEl('span', {
+            cls: 'copy-btn-text',
+            text: ''
+        });
+
+        foldBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleMessageFold(msgBubble, true);
+        });
+
+        // 复制按钮（第二个）
         const copyBtn = actions.createEl('button', {
             cls: 'message-action-btn message-copy-full-btn',
             attr: { 'aria-label': '复制消息' }
         });
-
-        // 图标容器
         const iconContainer = copyBtn.createEl('span', { cls: 'copy-btn-icon' });
         setIcon(iconContainer, 'copy');
-
-        // 文字标签
         const textLabel = copyBtn.createEl('span', {
             cls: 'copy-btn-text',
             text: ''
         });
 
-        // 点击事件
         copyBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
 
-            // 获取要复制的内容（优先使用 data 属性）
             const contentToCopy = msgBubble.getAttribute('data-message-content') || text;
 
             if (!contentToCopy.trim()) {
@@ -2133,17 +2169,14 @@ export class ChatView extends ItemView {
                 return;
             }
 
-            // 复制到剪贴板
             const success = await this.copyToClipboard(contentToCopy);
 
             if (success) {
-                // 成功反馈
                 copyBtn.addClass('copy-btn--success');
                 iconContainer.empty();
                 setIcon(iconContainer, 'check');
                 textLabel.setText('已复制');
 
-                // 2秒后恢复
                 setTimeout(() => {
                     copyBtn.removeClass('copy-btn--success');
                     iconContainer.empty();
@@ -2153,7 +2186,7 @@ export class ChatView extends ItemView {
             }
         });
 
-        // 覆盖当前笔记按钮（导出整段对话）
+        // 导出按钮（第三个）
         const exportBtn = actions.createEl('button', {
             cls: 'message-action-btn message-export-session-btn',
             attr: { 'aria-label': '导出会话到当前笔记' }
@@ -2188,6 +2221,156 @@ export class ChatView extends ItemView {
                 exportBtn.removeClass('busy');
             }
         });
+
+        // 删除按钮（最右侧）
+        const deleteBtn = actions.createEl('button', {
+            cls: 'message-action-btn message-delete-btn',
+            attr: { 'aria-label': '删除消息' }
+        });
+        const deleteIcon = deleteBtn.createEl('span', { cls: 'copy-btn-icon' });
+        setIcon(deleteIcon, 'trash-2');
+        const deleteText = deleteBtn.createEl('span', {
+            cls: 'copy-btn-text',
+            text: ''
+        });
+
+        deleteBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await this.deleteMessage(msgBubble);
+        });
+    }
+
+    // 切换消息折叠状态
+    private toggleMessageFold(msgBubble: HTMLElement, isFolding: boolean) {
+        const msgWrapper = msgBubble.closest('.chat-message-wrapper') as HTMLElement;
+        if (!msgWrapper) return;
+
+        const contentContainer = msgBubble.querySelector('.message-content-container') as HTMLElement;
+        const actions = msgBubble.querySelector('.message-actions') as HTMLElement;
+        
+        if (!contentContainer) return;
+
+        if (isFolding) {
+            // 折叠：隐藏内容，显示头部和展开按钮
+            msgBubble.addClass('message-folded');
+            contentContainer.style.display = 'none';
+            
+            // 隐藏操作区
+            if (actions) {
+                actions.style.display = 'none';
+            }
+
+            // 创建或显示消息头部（模型名称和时间戳）
+            let messageHeader = msgBubble.querySelector('.message-header') as HTMLElement | null;
+            if (!messageHeader) {
+                messageHeader = msgBubble.createEl('div', { cls: 'message-header' });
+                
+                // 获取模型名称
+                const activeModel = this.getSelectedChatModel();
+                const modelName = activeModel?.name || activeModel?.model || 'AI';
+                
+                // 创建模型名称标签
+                const modelLabel = messageHeader.createEl('span', {
+                    cls: 'message-header-model',
+                    text: modelName
+                });
+                
+                // 创建时间戳（使用当前时间，或者从消息数据中获取）
+                const timestamp = new Date().toLocaleTimeString('zh-CN', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+                const timeLabel = messageHeader.createEl('span', {
+                    cls: 'message-header-time',
+                    text: timestamp
+                });
+            }
+            messageHeader.style.display = 'flex';
+
+            // 创建或显示展开按钮（在气泡右侧）
+            let expandBtn = msgBubble.querySelector('.message-expand-btn') as HTMLElement | null;
+            if (!expandBtn) {
+                expandBtn = msgBubble.createEl('button', {
+                    cls: 'message-expand-btn',
+                    attr: { 'aria-label': '展开消息' }
+                });
+                const expandIcon = expandBtn.createEl('span', { cls: 'copy-btn-icon' });
+                setIcon(expandIcon, 'chevron-down');
+                const expandText = expandBtn.createEl('span', {
+                    cls: 'copy-btn-text',
+                    text: ''
+                });
+
+                expandBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleMessageFold(msgBubble, false);
+                });
+            }
+            expandBtn.style.display = 'flex';
+        } else {
+            // 展开：显示内容，隐藏头部和展开按钮，显示操作区
+            msgBubble.removeClass('message-folded');
+            contentContainer.style.display = '';
+            
+            // 隐藏头部
+            const messageHeader = msgBubble.querySelector('.message-header') as HTMLElement | null;
+            if (messageHeader) {
+                messageHeader.style.display = 'none';
+            }
+            
+            // 显示操作区
+            if (actions) {
+                actions.style.display = 'inline-flex';
+            }
+
+            // 隐藏展开按钮
+            const expandBtn = msgBubble.querySelector('.message-expand-btn') as HTMLElement | null;
+            if (expandBtn) {
+                expandBtn.style.display = 'none';
+            }
+        }
+    }
+
+    // 删除消息
+    private async deleteMessage(msgBubble: HTMLElement) {
+        const msgWrapper = msgBubble.closest('.chat-message-wrapper') as HTMLElement;
+        if (!msgWrapper) return;
+
+        const messageHistory = this.containerEl.querySelector('.chat-messages') as HTMLElement;
+        if (!messageHistory) return;
+
+        // 找到当前消息在DOM中的索引（只计算AI消息）
+        const allAIMessages = Array.from(messageHistory.querySelectorAll('.chat-message-wrapper.ai'));
+        const messageIndex = allAIMessages.indexOf(msgWrapper);
+        
+        if (messageIndex >= 0) {
+            // 从sessionManager中删除对应的消息
+            const messages = this.sessionManager.getMessages();
+            
+            // 找到对应的消息（AI消息在messages数组中的位置）
+            // 需要计算：每个用户消息后跟一个AI消息
+            let aiMessageCount = 0;
+            for (let i = 0; i < messages.length; i++) {
+                if (messages[i].role === 'assistant') {
+                    if (aiMessageCount === messageIndex) {
+                        // 删除这条AI消息和它前面的用户消息
+                        messages.splice(i - 1, 2); // 删除用户消息和AI消息
+                        break;
+                    }
+                    aiMessageCount++;
+                }
+            }
+            
+            // 保存会话
+            const currentSession = this.sessionManager.getCurrentSession();
+            if (currentSession) {
+                currentSession.messages = messages;
+                await this.sessionManager.saveSession(currentSession);
+            }
+        }
+
+        // 从DOM中移除（在保存后移除，避免索引问题）
+        msgWrapper.remove();
     }
 
     // 将当前会话内容导出到当前笔记；若无打开笔记则创建新笔记
