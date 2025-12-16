@@ -714,7 +714,7 @@ export class ChatView extends ItemView {
             };
 
             const backendUrl = this.plugin.settings.javaBackendUrl.replace(/\/$/, '');
-            const chatUrl = `${backendUrl}/api/rag/chat/stream`;
+            const chatUrl = `${backendUrl}/api/chat/stream`;
 
             const activeLlm = this.getSelectedChatModel();
             const providerCode = activeLlm?.provider;
@@ -2730,7 +2730,7 @@ export class ChatView extends ItemView {
     private async generateSessionTitleFromBackend(userQuestion: string, aiAnswer: string): Promise<string | null> {
         try {
             const backendUrl = this.plugin.settings.javaBackendUrl.replace(/\/$/, '');
-            const chatUrl = `${backendUrl}/api/rag/chat`;
+            const chatUrl = `${backendUrl}/api/chat`;
 
             // 使用高级设置中的标题生成配置，如果没有配置则使用当前 LLM 配置
             const activeLlm = this.getSelectedChatModel();
