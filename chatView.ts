@@ -2100,7 +2100,7 @@ export class ChatView extends ItemView {
 
     // 添加全文复制按钮和操作区
     private addFullCopyButton(msgBubble: HTMLElement, text: string) {
-        // 操作按钮容器（底部左侧对齐）
+        // 操作按钮容器（底部右侧对齐）
         let actions = msgBubble.querySelector('.message-actions') as HTMLElement | null;
         if (!actions) {
             actions = msgBubble.createEl('div', { cls: 'message-actions' });
@@ -2130,7 +2130,7 @@ export class ChatView extends ItemView {
             }
         }
 
-        // 创建折叠按钮（最左侧）
+        // 创建折叠按钮（操作区第一个按钮）
         const foldBtn = actions.createEl('button', {
             cls: 'message-action-btn message-fold-btn',
             attr: { 'aria-label': '折叠消息' }
@@ -2222,7 +2222,7 @@ export class ChatView extends ItemView {
             }
         });
 
-        // 删除按钮（最右侧）
+        // 删除按钮（操作区最后一个按钮）
         const deleteBtn = actions.createEl('button', {
             cls: 'message-action-btn message-delete-btn',
             attr: { 'aria-label': '删除消息' }
@@ -2287,7 +2287,7 @@ export class ChatView extends ItemView {
             }
             messageHeader.style.display = 'flex';
 
-            // 创建或显示展开按钮（在气泡右侧）
+            // 创建或显示展开按钮（在气泡右下角）
             let expandBtn = msgBubble.querySelector('.message-expand-btn') as HTMLElement | null;
             if (!expandBtn) {
                 expandBtn = msgBubble.createEl('button', {
